@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build --workspace=frontend",
+  "outputDirectory": "frontend/.next",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "https://lumen-promptwars.onrender.com",
+    "NEXT_PUBLIC_WS_URL": "wss://lumen-promptwars.onrender.com"
+  }
+}

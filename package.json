@@ -1,0 +1,13 @@
+{
+  "name": "lumen",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=frontend"
+  },
+  "dependencies": {
+    "next": "16.3.4"
+  }
+}
