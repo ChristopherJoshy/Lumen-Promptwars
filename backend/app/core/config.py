@@ -10,8 +10,8 @@ class Settings(BaseSettings):
     app_name: str = "Lumen"
     app_env: str = "dev"
     database_url: str = ""  # empty -> local SQLite fallback (see db/session.py)
+    mongo_url: str = ""  # empty -> usage ledger disabled (see db/usage.py)
     redis_url: str = "redis://localhost:6379/0"
-    s3_endpoint: str = ""
     s3_bucket: str = "lumen-media"
     s3_access_key: str = ""
     s3_secret_key: str = ""

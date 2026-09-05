@@ -25,6 +25,7 @@ import tempfile
 import time
 from pathlib import Path
 from app.core.config import settings
+from app.db import usage
 from app.features.analysis.agents import judge, links, muse_client, near_dup, sarvam, searcher, temporal
 
 _TRACKER_PARAMS = frozenset(
@@ -56,6 +57,18 @@ def _near_hit(case_id: str | None) -> dict | None:
     hit["cached"] = "near-duplicate"
     hit["duplicate_of"] = case_id
     return hit
+
+
+async def _log_usage(result: dict, *, modality: str, source: str, case_id: str) -> None:
+    """Best-effort usage row; failures stay inside usage.log_case."""
+    await usage.log_case(
+        case_id=case_id,
+        modality=modality,
+        verdict=str(result.get("verdict", "")),
+        confidence=float(result.get("confidence", 0.0) or 0.0),
+        source=source,
+        cached=result.get("cached", False),
+    )
 
 _SARVAM_EXT = {
     "audio/mpeg": "audio.mp3",
@@ -326,6 +339,7 @@ async def analyze_image(
     )
     _cache_put(cache_key, result)
     near_dup.remember_image(data, cache_key, "image")
+    await _log_usage(result, modality="image", source=source, case_id=cache_key)
     return result
 
 
@@ -358,7 +372,7 @@ async def analyze_video(
     _cache_put(cache_key, result)
     for frame in probe_frames:
         near_dup.remember_image(frame, cache_key, "video")
-    _cache_put(cache_key, result)
+    await _log_usage(result, modality="video", source=source, case_id=cache_key)
     return result
 
 
@@ -399,8 +413,8 @@ async def analyze_audio(
     _cache_put(cache_key, result)
     transcript = ((result.get("signals", {}).get("sarvam") or {}).get("result") or {}).get("transcript", "")
     await asyncio.to_thread(near_dup.remember_transcript, transcript, cache_key)
+    await _log_usage(result, modality="audio", source=source, case_id=cache_key)
     return result
-
 
 async def analyze_link(url: str, *, source: str) -> dict:
     """Resolve a link, then dispatch on kind; unresolved stays searcher-only."""
@@ -435,6 +449,7 @@ async def analyze_link(url: str, *, source: str) -> dict:
             caption=caption_seed[:500],
         )
         _cache_put(cache_key, result)
+        await _log_usage(result, modality="link", source=source, case_id=cache_key)
         return result
     data = resolved["data"]
     mime = resolved.get("mime") or "video/mp4"

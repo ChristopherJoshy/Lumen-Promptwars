@@ -39,3 +39,11 @@ async def forensics_heatmap(case_id: str, name: str) -> FileResponse:
     if path is None:
         raise HTTPException(status_code=404, detail="Unknown case or heatmap.")
     return FileResponse(path, media_type="image/png")
+
+
+@router.get("/usage")
+async def usage() -> dict:
+    """Usage counts by verdict/modality; {} when the ledger is disabled."""
+    from app.db import usage as usage_ledger
+
+    return await usage_ledger.usage_stats()
