@@ -29,9 +29,10 @@ def format_verdict(verdict: str, reason: str, report_url: str) -> str:
     return "\n\n".join(parts)
 
 
-def format_failure() -> str:
+def format_failure(reason: str = "") -> str:
     """Build the honest error reply when analysis cannot finish."""
-    return (
-        "Analysis hit a snag — reply RETRY or use the web upload. "
-        "No verdict was reached, so nothing here is a result.\n\n" + DISCLAIMER
-    )
+    body = "Analysis hit a snag — reply RETRY or use the web upload. "
+    if reason.strip():
+        body += f"Reason: {reason.strip()[:160]} "
+    body += "No verdict was reached, so nothing here is a result.\n\n" + DISCLAIMER
+    return body

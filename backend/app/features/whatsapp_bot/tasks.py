@@ -110,28 +110,28 @@ async def handle_inbound(payload: dict) -> str:
         try:
             data = await wa_media.download(media_url)
             result = await agentic.analyze_image(data, mime=content_type, source="whatsapp")
-        except Exception:
-            return await reply(format_failure())
+        except Exception as exc:
+            return await reply(format_failure(str(exc)))
         return await _answer_case(result)
     if content_type.startswith("video/"):
         try:
             data = await wa_media.download(media_url)
             result = await agentic.analyze_video(data, mime=content_type, source="whatsapp")
-        except Exception:
-            return await reply(format_failure())
+        except Exception as exc:
+            return await reply(format_failure(str(exc)))
         return await _answer_case(result)
     if content_type.startswith("audio/"):
         try:
             data = await wa_media.download(media_url)
             result = await agentic.analyze_audio(data, mime=content_type, source="whatsapp")
-        except Exception:
-            return await reply(format_failure())
+        except Exception as exc:
+            return await reply(format_failure(str(exc)))
         return await _answer_case(result)
     if body.startswith(("http://", "https://")):
         try:
             result = await agentic.analyze_link(body, source="whatsapp")
-        except Exception:
-            return await reply(format_failure())
+        except Exception as exc:
+            return await reply(format_failure(str(exc)))
         return await _answer_case(result)
     if body.strip().upper() == "RETRY" and sender in _LAST_CASE:
         case = analysis_service.get_case(_LAST_CASE[sender])
@@ -151,7 +151,7 @@ async def handle_inbound(payload: dict) -> str:
     if body and sender in _LAST_CASE:
         try:
             answer = await analysis_service.answer_question(_LAST_CASE[sender], body)
-        except Exception:
-            return await reply(format_failure())
+        except Exception as exc:
+            return await reply(format_failure(str(exc)))
         return await reply(f"{answer}\n\n{DISCLAIMER}")
     return await reply(HELP_TEXT)
