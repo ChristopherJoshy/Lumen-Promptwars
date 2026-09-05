@@ -27,7 +27,10 @@ async def webhook(request: Request) -> Response:
     if not public_url:
         raise HTTPException(status_code=403, detail="twilio_webhook_url is not configured.")
     signature = request.headers.get("X-Twilio-Signature", "")
-    form = await request.form()
+    try:
+        form = await request.form()
+    except AssertionError as exc:
+        raise HTTPException(status_code=500, detail=f"Form parsing unavailable: {exc}") from exc
     params = {str(k): str(v) for k, v in form.multi_items()}
     if not valid_twilio_signature(public_url, params, signature, token):
         raise HTTPException(status_code=403, detail="Bad webhook signature.")
