@@ -1,0 +1,42 @@
+# Render hosting for the Lumen backend (FastAPI). The frontend ships on Vercel
+# (see vercel.json) pointed at this service via NEXT_PUBLIC_API_URL.
+# NOTE: Render file must be named render.yaml — render.json is not read.
+services:
+  - type: web
+    name: lumen-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir backend
+    healthCheckPath: /api/v1/analysis/status
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: DATABASE_URL
+        sync: false # Render Postgres, or empty for the SQLite fallback
+      - key: REDIS_URL
+        sync: false # Render Key Value, or empty for direct (no-queue) mode
+      - key: FRONTEND_URL
+        sync: false # Vercel URL of the frontend
+      - key: OPENCODE_ZEN_API_KEY
+        sync: false
+      - key: MUSE_MODEL
+        value: muse-spark-1.3-contributor-free
+      - key: EXA_API_KEY
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: SARVAM_BASE_URL
+        value: https://api.sarvam.ai
+      - key: SARVAM_MODEL
+        value: saaras:v3
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_NUMBER
+        sync: false
+    disk:
+      name: lumen-storage
+      mountPath: /opt/render/project/src/storage
+      sizeGB: 1
