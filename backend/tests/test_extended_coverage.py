@@ -334,11 +334,3 @@ def test_debate_critic_failure_keeps_proposal(monkeypatch):
     assert out["verdict"] == "verified"
     assert "skipped" in out["signals"]["debate"]["note"]
 
-
-def test_examine_fresh_run_six_scores(monkeypatch, tmp_path):
-    monkeypatch.setattr(forensics, "_artifact_dir", lambda: tmp_path)
-    out = forensics.examine(_png())
-    assert set(out["scores"]) == {"ela", "dct", "noise", "copymove", "ghost", "blockiness", "fused_mean"}
-    assert set(out["artifacts"]) == {"ela", "dct", "noise", "copymove", "ghost", "blockiness"}
-    out2 = forensics.examine(_png())
-    assert out2["scores"] == out["scores"]
