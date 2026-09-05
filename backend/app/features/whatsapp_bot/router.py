@@ -9,7 +9,6 @@ the verdict still arrives as a WhatsApp message.
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request, Response
-from xml.sax.saxutils import escape
 
 from app.core.config import settings
 from app.features.whatsapp_bot.tasks import handle_inbound, valid_twilio_signature
@@ -19,7 +18,15 @@ router = APIRouter()
 
 @router.post("/webhook")
 async def webhook(request: Request) -> Response:
-    """Accept one inbound Twilio message; 403 on missing/bad signature."""
+    """Accept one inbound Twilio message; 403 on missing/bad signature.
+
+    Answers in milliseconds and analyzes in the background: Twilio gives up
+    waiting after ~15 s, while a full case takes ~40 s. Every reply travels
+    through the Messages API, so nothing the user should see is lost.
+    """
+    import asyncio
+    import logging
+
     token = settings.twilio_auth_token
     if not token:
         raise HTTPException(status_code=403, detail="WhatsApp webhook is not configured.")
@@ -34,9 +41,15 @@ async def webhook(request: Request) -> Response:
     params = {str(k): str(v) for k, v in form.multi_items()}
     if not valid_twilio_signature(public_url, params, signature, token):
         raise HTTPException(status_code=403, detail="Bad webhook signature.")
-    reply = await handle_inbound(params)
-    twiml = (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        f"<Response><Message>{escape(reply)}</Message></Response>"
+
+    async def _run() -> None:
+        try:
+            await handle_inbound(params)
+        except Exception as exc:
+            logging.getLogger("lumen.whatsapp").warning("Background case failed: %s", exc)
+
+    asyncio.create_task(_run())
+    return Response(
+        content='<?xml version="1.0" encoding="UTF-8"?><Response/>',
+        media_type="text/xml",
     )
-    return Response(content=twiml, media_type="text/xml")
