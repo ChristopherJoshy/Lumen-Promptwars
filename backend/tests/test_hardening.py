@@ -151,3 +151,45 @@ def test_signal_rows_debate_agreed_and_skipped(monkeypatch):
     )
     rows = service.list_signals("x" * 64)
     assert rows is not None and "skipped" in rows[0]["finding"]
+
+
+def test_twilio_signature_roundtrip():
+    from app.features.whatsapp_bot.tasks import valid_twilio_signature
+    import base64
+    import hashlib
+    import hmac
+
+    url = "https://lumen.example.com/api/v1/whatsapp/webhook"
+    params = {"From": "whatsapp:+911234567890", "Body": "hi"}
+    token = "test-token"
+    base = url + "".join(k + params[k] for k in sorted(params))
+    sig = base64.b64encode(hmac.new(token.encode(), base.encode(), hashlib.sha1).digest()).decode()
+    assert valid_twilio_signature(url, params, sig, token) is True
+    assert valid_twilio_signature(url, params, "bogus", token) is False
+    assert valid_twilio_signature(url, params, sig, "") is False
+
+
+def test_webhook_rejects_without_config(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "twilio_auth_token", "")
+    resp = client.post("/api/v1/whatsapp/webhook", data={"Body": "hi"})
+    assert resp.status_code == 403
+
+
+def test_export_dossier_shape_and_404():
+    from app.features.reports.evidentiary_export import build_dossier
+
+    case = {
+        "verdict": "verified",
+        "confidence": 0.9,
+        "explanation": "e",
+        "reasons": ["r"],
+        "evidence": {"sha256": "abc"},
+        "model_version": "m",
+        "signals": {"debate": {"agreed": True}},
+    }
+    dossier = build_dossier("case-1", case)
+    assert dossier["case_id"] == "case-1"
+    assert "not a legal certification" in dossier["disclaimer"]
+    assert client.get(f"/api/v1/reports/{'0' * 64}/export").status_code == 404

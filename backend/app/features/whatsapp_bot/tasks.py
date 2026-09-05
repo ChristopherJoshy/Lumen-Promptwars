@@ -10,6 +10,20 @@ never resembles a verdict.
 from __future__ import annotations
 
 
+def valid_twilio_signature(url: str, params: dict[str, str], signature: str, token: str) -> bool:
+    """Twilio HMAC-SHA1 webhook check (stdlib only, no SDK).
+
+    base64(HMAC-SHA1(token, public_url + sorted key+value pairs)).
+    """
+    import base64
+    import hashlib
+    import hmac
+
+    if not url or not token or not signature:
+        return False
+    base = url + "".join(key + params[key] for key in sorted(params))
+    digest = hmac.new(token.encode(), base.encode(), hashlib.sha1).digest()
+    return hmac.compare_digest(base64.b64encode(digest).decode(), signature)
 HELP_TEXT = (
     "Send a photo, video, voice note, or paste a link and Lumen will check it. "
     "For files over 16 MB, use the web upload instead."

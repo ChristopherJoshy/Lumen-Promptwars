@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_whatsapp_number: str = ""
+    twilio_webhook_url: str = ""
     google_fact_check_api_key: str = ""
     opencode_zen_api_key: str = ""
     opencode_zen_base_url: str = "https://opencode.ai/zen/v1"
