@@ -32,4 +32,10 @@ async def send_verdict(to: str, text: str, report_url: str) -> None:
     except httpx.HTTPError as exc:
         raise ValueError(f"Twilio send failed: {type(exc).__name__}") from exc
     if resp.status_code >= 400:
-        raise ValueError(f"Twilio send failed (HTTP {resp.status_code}).")
+        try:
+            detail = resp.json()
+            code = detail.get("code", "?")
+            message = detail.get("message", "")[:160]
+        except ValueError:
+            code, message = "?", resp.text[:160]
+        raise ValueError(f"Twilio send failed (HTTP {resp.status_code}, code {code}): {message}")
