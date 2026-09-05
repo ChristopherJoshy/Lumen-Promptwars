@@ -73,11 +73,15 @@ async def _log_usage(result: dict, *, modality: str, source: str, case_id: str) 
 _SARVAM_EXT = {
     "audio/mpeg": "audio.mp3",
     "audio/wav": "audio.wav",
+    "audio/x-wav": "audio.wav",
     "audio/x-m4a": "audio.m4a",
     "audio/ogg": "audio.ogg",
+    "audio/opus": "audio.opus",
+    "audio/webm": "audio.webm",
     "audio/mp4": "audio.mp4",
+    "audio/aac": "audio.aac",
+    "audio/3gpp": "audio.3gp",
 }
-
 
 def _sarvam_filename(mime: str) -> str:
     return _SARVAM_EXT.get(mime.lower(), "audio.mp3")
@@ -90,8 +94,19 @@ _WHATSAPP_MAX = 16 * 1024 * 1024
 _VIDEO_MAX_S = 120
 
 _IMAGE_MIMES = ("image/jpeg", "image/png", "image/webp")
-_VIDEO_MIMES = ("video/mp4", "video/mov", "video/webm")
-_AUDIO_MIMES = ("audio/mpeg", "audio/wav", "audio/x-m4a", "audio/ogg", "audio/mp4")
+_VIDEO_MIMES = ("video/mp4", "video/mov", "video/webm", "video/3gpp")
+_AUDIO_MIMES = (
+    "audio/mpeg",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/x-m4a",
+    "audio/ogg",
+    "audio/opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/aac",
+    "audio/3gpp",
+)
 
 
 class AnalysisError(Exception):
