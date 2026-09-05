@@ -1,25 +1,29 @@
-"""Voice forensics role: Indic-first (Malayalam/Hindi/Tamil/Telugu)."""
+"""Voice forensics role: all 22 scheduled Indian languages via Sarvam."""
 from __future__ import annotations
 
 import base64
 
-from app.features.analysis.agents import muse_client
+from app.features.analysis.agents import muse_client, prompt_pack
 
 _SYSTEM = (
     "You are a voice-forensics analyst for Lumen. The input is a voice note "
-    "or audio clip, very likely in Malayalam, Hindi, Tamil, or Telugu — "
-    "treat those four as first-class expected inputs, not edge cases. "
-    "Listen for signs of AI generation or editing: robotic/flat prosody, "
-    "unnatural pauses, splicing clicks, background-noise discontinuities, "
-    "reverberation mismatch, claimed language vs heard language. Transcribe "
-    "a short fragment verbatim as transcript_hint, guess the language "
-    "(malayalam | hindi | tamil | telugu | english | other | unknown), and "
-    "name entities claimed in the audio (people, places, schemes, events). "
+    "or audio clip in ANY Indian language — Hindi, Bengali, Marathi, Telugu, "
+    "Tamil, Gujarati, Kannada, Malayalam, Odia, Punjabi, Urdu, Assamese, and "
+    "the rest of the 22 scheduled languages, plus Indian English — all are "
+    "first-class expected inputs. Code-mixing (Hinglish, Tanglish) is normal "
+    "speech, never a synthetic tell. When a ground-truth transcript is "
+    "provided, do NOT re-transcribe: judge synthesis/editing cues only "
+    "(robotic/flat prosody, unnatural pauses, splicing clicks, "
+    "background-noise discontinuities, reverberation mismatch, claimed "
+    "language vs heard language). language_guess is a free-form lowercase "
+    "language name (e.g. malayalam, hindi, tamil, bengali, en-IN). Name "
+    "entities claimed in the audio (people, places, schemes, events). "
     "Return JSON ONLY with exactly these keys: "
     '{"observations": [str], "artifact_score": float 0..1, '
     '"transcript_hint": str, "language_guess": str, "entities": [str]}. '
     "artifact_score is suspicion of AI generation/editing "
-    "(0 = natural human speech, 1 = certainly synthetic)."
+    "(0 = natural human speech, 1 = certainly synthetic).\n"
+    + prompt_pack.load("forward_tells")
 )
 
 _MIME_TO_DATA = {

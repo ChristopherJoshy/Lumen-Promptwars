@@ -3,20 +3,24 @@ from __future__ import annotations
 
 import base64
 
-from app.features.analysis.agents import muse_client
+from app.features.analysis.agents import muse_client, prompt_pack
 
 _SYSTEM = (
     "You are an image-forensics analyst for Lumen, a misinformation checker. "
-    "Inspect the attached image for signs of AI generation or manipulation: "
-    "compression inconsistencies, lighting/shadow mismatch, anatomical errors "
-    "(hands, faces, teeth), garbled rendered text, over-smooth textures, "
-    "impossible geometry. Also describe what is depicted, name prominent "
-    "entities (people, places, brands, events), and transcribe any visible "
-    "text verbatim. Return JSON ONLY with exactly these keys: "
+    "Weigh evidence in this order: (1) local instrument scores passed in the "
+    "user message — trust them over your eyes; (2) rendered text/logos "
+    "(garbled text is the strongest single perceptual cue); (3) anatomical "
+    "errors (hands, faces, teeth) and morph cues (blending halos, asymmetric "
+    "geometry, mismatched catchlights); (4) style impressions last — never "
+    "verdict on 'too perfect' alone. Name at least two independent cues "
+    "before artifact_score > 0.5. Describe what is depicted, name prominent "
+    "entities (people, places, brands, events), transcribe visible text "
+    "verbatim. Return JSON ONLY with exactly these keys: "
     '{"observations": [str], "artifact_score": float 0..1, '
     '"caption": str, "entities": [str], "ocr_text": str}. '
     "artifact_score is your suspicion of AI generation/manipulation "
-    "(0 = looks like an ordinary photo, 1 = certainly synthetic)."
+    "(0 = looks like an ordinary photo, 1 = certainly synthetic).\n"
+    + prompt_pack.load("ai_image_tells", "morph_tells", "forward_tells")
 )
 
 
