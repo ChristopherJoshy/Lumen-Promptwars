@@ -97,10 +97,14 @@ async def handle_inbound(payload: dict) -> str:
         return f"{settings.frontend_url}/report/{case_id}"
 
     async def _answer_case(result: dict) -> str:
+        import asyncio
+
         case_id = str(result.get("case_id", ""))
         if sender and case_id:
             _LAST_CASE[sender] = case_id
         url = _report_url(case_id)
+        # Sandbox allows ~1 message per 3 s; the ack already used one slot.
+        await asyncio.sleep(4)
         return await reply(
             format_verdict(result["verdict"], _first_sentence(result.get("explanation", "")), url),
             url,

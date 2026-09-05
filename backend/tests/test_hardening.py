@@ -212,3 +212,41 @@ def test_upload_envelope_shape(monkeypatch):
     assert resp.status_code == 200, resp.text[:200]
     body = resp.json()
     assert body == {"job_id": "abc123", "case_id": "abc123", "verdict": "verified", "confidence": 0.9}
+
+
+def test_sender_number_normalized(monkeypatch):
+    import httpx
+    from app.core.config import settings
+    from app.features.whatsapp_bot import client as wa_client
+
+    seen: dict = {}
+
+    class _FakeResp:
+        status_code = 201
+
+        def json(self):
+            return {}
+
+    class _FakeClient:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, data=None, **k):
+            seen.update(data or {})
+            return _FakeResp()
+
+    monkeypatch.setattr(settings, "twilio_account_sid", "sid")
+    monkeypatch.setattr(settings, "twilio_auth_token", "tok")
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeClient)
+    import asyncio
+
+    for raw in ["+14155238886", "14155238886", "+1 (415) 523-8886", "whatsapp:+14155238886"]:
+        monkeypatch.setattr(settings, "twilio_whatsapp_number", raw)
+        asyncio.run(wa_client.send_verdict("whatsapp:+911234567890", "hi", ""))
+        assert seen["From"] == "whatsapp:+14155238886", raw
