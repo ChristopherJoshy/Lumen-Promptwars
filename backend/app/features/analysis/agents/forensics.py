@@ -230,6 +230,7 @@ def examine(data: bytes) -> dict:
             path.write_bytes(res["heatmap_png"])
         artifacts[name] = str(path)
     scores = {name: round(float(res["score"]), 3) for name, res in results.items()}
+    mean = round(sum(scores.values()) / len(scores), 3)
     payload = {
         "scores": {**scores, "fused_mean": mean},
         "artifacts": artifacts,
