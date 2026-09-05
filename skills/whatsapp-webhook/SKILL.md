@@ -12,6 +12,10 @@ Checklist for anything touching `backend/app/features/whatsapp_bot/`.
 
 ## Media + tasks
 
+- `tasks.py`: reply via `client.py` — build text with
+  `messages.format_verdict()` (verdict-first, optional Why, report link,
+  disclaimer always) — never hand-format reply copy. Detail lives on the
+  web, not in chat.
 - `media.py`: Basic-Auth download of `MediaUrl0`; feeds the **same** analysis
   pipeline as direct upload (no forked detection path). Over 16 MB → reply
   "use web upload instead", never silent failure.

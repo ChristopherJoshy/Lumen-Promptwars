@@ -59,8 +59,8 @@ export aligned with India's Feb 2026 IT rules. Optimize every decision for
 - Backend setup: `backend/.venv/Scripts/pip install -r backend/requirements.txt`
 - Backend dev (no Docker): `backend/.venv/Scripts/uvicorn app.main:app --reload --port 8000 --app-dir backend`
 - Frontend dev: `cd frontend && npm install && npm run dev` (port 3000)
-- Backend tests: `cd backend && .venv/Scripts/pytest -q`
-- Frontend checks: `cd frontend && npm run lint && npx tsc --noEmit`
+- Backend tests (from repo root): `backend/.venv/Scripts/python -m pytest backend/tests -q`
+- Frontend checks: `cd frontend && npx tsc --noEmit` (`npm run build` for the full production check; `next lint` no longer exists in Next 16)
 - Migrations: `cd backend && .venv/Scripts/alembic upgrade head` (new: `.venv/Scripts/alembic revision --autogenerate -m "..."`; applied ones append-only)
 
 ## Layout (feature-based, never flat top-level routers//models/)
