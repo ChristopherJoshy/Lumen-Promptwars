@@ -243,3 +243,89 @@ def test_usage_ledger_disabled_and_safe(monkeypatch):
     monkeypatch.setattr(usage, "get_client", lambda: _Boom())
     assert _run(usage.log_case(case_id="x", modality="m", verdict="v", confidence=0.5, source="s")) is None
     assert _run(usage.usage_stats()) == {}
+
+
+def test_reasoning_effort_low_by_default(monkeypatch):
+    seen: dict = {}
+
+    class _CapClient(_QueueClient):
+        async def post(self, *args, **kwargs):
+            seen.update(kwargs.get("json", {}))
+            return _FakeResponse(200, {"output": [{"type": "message", "content": [{"type": "output_text", "text": "{}"}]}]})
+
+    from app.features.analysis.agents import muse_client
+
+    monkeypatch.setattr(muse_client.httpx, "AsyncClient", _CapClient)
+    monkeypatch.setattr(muse_client.settings, "opencode_zen_api_key", "k")
+    _run(muse_client.respond("sys", [{"type": "input_text", "text": "hi"}]))
+    assert seen.get("reasoning") == {"effort": "low"}
+
+
+def _fusion_kwargs():
+    return {
+        "modality": "image",
+        "perceptual": {"artifact_score": 0.1},
+        "meta_info": {"sha256": "abc"},
+        "search_result": {"exa_hits": [], "ddg_hits": [], "india_hits": []},
+        "claimed_date": None,
+        "source": "upload",
+        "caption": "lamp",
+    }
+
+
+def _verdict(v):
+    return {"verdict": v, "confidence": 0.9, "explanation": "e", "reasons": ["r"]}
+
+
+def test_debate_agree_keeps_proposal(monkeypatch):
+    from app.features.analysis.agents import critic
+
+    async def fake_fuse(signals, source):
+        return _verdict("verified")
+
+    async def fake_review(proposal, signals, source):
+        return {"agree": True, "counter_reasons": [], "suggested_verdict": proposal["verdict"]}
+
+    monkeypatch.setattr(agentic.judge, "fuse", fake_fuse)
+    monkeypatch.setattr(critic, "review", fake_review)
+    out = _run(agentic.run_fusion(**_fusion_kwargs()))
+    assert out["verdict"] == "verified"
+    assert out["signals"]["debate"] == {"agreed": True, "counter_reasons": []}
+
+
+def test_debate_disagree_judge_has_last_word(monkeypatch):
+    from app.features.analysis.agents import critic
+
+    calls: list = []
+
+    async def fake_fuse(signals, source):
+        calls.append("challenge" in signals)
+        return _verdict("verified" if "challenge" not in signals else "insufficient_evidence")
+
+    async def fake_review(proposal, signals, source):
+        return {"agree": False, "counter_reasons": ["no dated hit"], "suggested_verdict": "insufficient_evidence"}
+
+    monkeypatch.setattr(agentic.judge, "fuse", fake_fuse)
+    monkeypatch.setattr(critic, "review", fake_review)
+    out = _run(agentic.run_fusion(**_fusion_kwargs()))
+    assert calls == [False, True]
+    assert out["verdict"] == "insufficient_evidence"
+    assert out["signals"]["debate"]["agreed"] is False
+    assert any("Debate" in r for r in out["reasons"])
+
+
+def test_debate_critic_failure_keeps_proposal(monkeypatch):
+    from app.features.analysis.agents import critic
+    from app.features.analysis.agents import muse_client
+
+    async def fake_fuse(signals, source):
+        return _verdict("verified")
+
+    async def boom(proposal, signals, source):
+        raise muse_client.MuseError("critic down")
+
+    monkeypatch.setattr(agentic.judge, "fuse", fake_fuse)
+    monkeypatch.setattr(critic, "review", boom)
+    out = _run(agentic.run_fusion(**_fusion_kwargs()))
+    assert out["verdict"] == "verified"
+    assert "skipped" in out["signals"]["debate"]["note"]

@@ -177,9 +177,13 @@ def test_link_unresolved_cap_never_verified(monkeypatch):
             "reasons": ["looks fine"],
         }
 
+    async def fake_review(proposal, signals, source):
+        return {"agree": True, "counter_reasons": [], "suggested_verdict": proposal["verdict"]}
+
     monkeypatch.setattr(agentic.links, "resolve", fake_resolve)
     monkeypatch.setattr(agentic.searcher, "search", fake_search)
     monkeypatch.setattr(agentic.judge, "fuse", fake_fuse)
+    monkeypatch.setattr("app.features.analysis.agents.critic.review", fake_review)
     result = _run(agentic.analyze_link("https://www.instagram.com/p/xyz/", source="upload"))
     assert result["verdict"] != "verified"
     assert result["verdict"] == "insufficient_evidence"

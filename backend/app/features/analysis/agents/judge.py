@@ -5,7 +5,7 @@ import json
 
 from app.features.analysis.agents import muse_client, prompt_pack
 
-_VERDICTS = ("verified", "contradiction_detected", "likely_synthetic", "insufficient_evidence")
+VERDICTS = ("verified", "contradiction_detected", "likely_synthetic", "insufficient_evidence")
 
 _SYSTEM = (
     "You are the fusion judge for Lumen, a misinformation checker. Given "
@@ -21,8 +21,10 @@ _SYSTEM = (
     "contradicting evidence; contradiction_detected means the file's story "
     "(caption/dates/claims) disagrees with pixels, metadata, or dated hits. "
     "Thin or conflicting signals without a winner are insufficient_evidence "
-    "— say so explicitly. explanation is 2-4 plain-language sentences a "
-    "non-technical reader understands. Return JSON ONLY: "
+    "— say so explicitly. If a 'challenge' object is present, it is a "
+    "critic's dissent: address its counter-reasons explicitly in reasons. "
+    "explanation is 2-4 plain-language sentences a non-technical reader "
+    "understands. Return JSON ONLY: "
     '{"verdict": str, "confidence": float 0..1, "explanation": str 2-4 sentences, '
     '"reasons": [str]}. Reference concrete artifacts, dates, and hit URLs; '
     "never hedge generically.\n"
@@ -55,7 +57,7 @@ async def fuse(signals: dict, source: str) -> dict:
         _SYSTEM, [{"type": "input_text", "text": user_text}], max_output_tokens=4096
     )
     verdict = str(result.get("verdict", ""))
-    if verdict not in _VERDICTS:
+    if verdict not in VERDICTS:
         raise muse_client.MuseError(f"Judge returned unknown verdict: {verdict[:100]}")
     try:
         confidence = float(result.get("confidence", 0.0))

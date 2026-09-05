@@ -253,6 +253,39 @@ async def run_search(*, caption: str, entities: list[str], ocr_text: str) -> dic
         raise AnalysisError(f"Search failed: {exc}") from exc
 
 
+async def _run_debate(signals: dict, proposal: dict, source: str) -> tuple[dict, dict]:
+    """One bounded dissent round: critic attacks, judge reconsiders once.
+
+    The judge has the last word; disagreement is recorded, never hidden. A
+    critic failure keeps the proposal with a skipped-debate note — debate is
+    advisory, verdicts never depend on it.
+    """
+    from app.features.analysis.agents import critic  # lazy: keeps import graph flat
+
+    try:
+        challenge = await critic.review(proposal, signals, source)
+    except (muse_client.MuseError, ValueError) as exc:
+        return proposal, {"agreed": None, "note": f"debate skipped: {exc}"}
+    if challenge.get("agree"):
+        return proposal, {"agreed": True, "counter_reasons": []}
+    second = dict(signals)
+    second["challenge"] = challenge
+    try:
+        final = await judge.fuse(second, source)
+    except muse_client.MuseError as exc:
+        raise AnalysisError(f"Reconsideration failed: {exc}") from exc
+    final = dict(final)
+    final["reasons"] = list(final.get("reasons", [])) + [
+        f"Debate: critic argued {challenge.get('suggested_verdict', '?')} — "
+        f"judge held {final.get('verdict', '?')} after reconsideration."
+    ]
+    return final, {
+        "agreed": False,
+        "counter_reasons": challenge.get("counter_reasons", []),
+        "suggested_verdict": challenge.get("suggested_verdict", ""),
+    }
+
+
 async def run_fusion(
     *,
     modality: str,
@@ -292,6 +325,8 @@ async def run_fusion(
         fused = await judge.fuse(signals, source)
     except muse_client.MuseError as exc:
         raise AnalysisError(f"Fusion failed: {exc}") from exc
+    fused, debate = await _run_debate(signals, fused, source)
+    signals["debate"] = debate
     if unresolved_platform and fused.get("verdict") == "verified":
         fused = dict(fused)
         fused["verdict"] = "insufficient_evidence"

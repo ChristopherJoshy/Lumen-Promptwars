@@ -65,6 +65,7 @@ async def respond(
     *,
     json_only: bool = True,
     max_output_tokens: int = 2000,
+    reasoning_effort: str = "low",
 ) -> dict:
     """Call the Zen Responses API and return parsed JSON (or raw text).
 
@@ -73,6 +74,8 @@ async def respond(
         user_parts: Content blocks (input_text / input_image / input_audio).
         json_only: Strip fences and json.loads the model text.
         max_output_tokens: Token budget (default 2000; reasoning eats the headroom).
+        reasoning_effort: Thinking level; "low" everywhere (probe 2026-09-05:
+            the endpoint accepts reasoning.effort and returns 200).
 
     Returns:
         Parsed dict when json_only, else ``{"text": ...}``.
@@ -89,6 +92,7 @@ async def respond(
         "instructions": system,
         "input": [{"role": "user", "content": user_parts}],
         "max_output_tokens": max_output_tokens,
+        "reasoning": {"effort": reasoning_effort},
     }
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     last_error: str = ""
