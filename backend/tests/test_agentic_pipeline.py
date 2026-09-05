@@ -284,3 +284,64 @@ def test_temporal_check_no_dates():
     out = temporal.check({}, [], None)
     assert out["flag"] is False
     assert out["earliest_seen"] is None
+
+
+def test_whatsapp_conversation_remembers_and_answers(monkeypatch):
+    from app.features.whatsapp_bot import tasks as wa_tasks
+
+    async def fake_link(url, *, source):
+        return {
+            "verdict": "verified",
+            "confidence": 0.9,
+            "explanation": "Clean pixels here.",
+            "reasons": ["r"],
+            "signals": {},
+            "model_version": "m@agentic-v1",
+            "evidence": {"sha256": "aabbccddeeff0011", "caption": "c"},
+            "cached": False,
+            "case_id": "c" * 64,
+        }
+
+    async def fake_answer(case_id, question):
+        assert case_id == "c" * 64
+        return f"answered: {question}"
+
+    async def fake_send(to, text, report_url):
+        assert f"/report/{'c' * 64}" in text or "answered" in text
+
+    monkeypatch.setattr("app.features.analysis.agents.pipeline.analyze_link", fake_link)
+    monkeypatch.setattr("app.features.analysis.service.answer_question", fake_answer)
+    monkeypatch.setattr("app.features.whatsapp_bot.client.send_verdict", fake_send)
+    wa_tasks._LAST_CASE.clear()
+    sender = {"From": "whatsapp:+911234567890", "Body": "https://youtu.be/abc", "NumMedia": "0"}
+    _run(wa_tasks.handle_inbound(sender))
+    assert wa_tasks._LAST_CASE.get("whatsapp:+911234567890") == "c" * 64
+    follow = _run(
+        wa_tasks.handle_inbound(
+            {"From": "whatsapp:+911234567890", "Body": "why?", "NumMedia": "0"}
+        )
+    )
+    assert follow.startswith("answered: why?")
+    retry = _run(
+        wa_tasks.handle_inbound(
+            {"From": "whatsapp:+911234567890", "Body": "RETRY", "NumMedia": "0"}
+        )
+    )
+    assert "expired" in retry
+    import json as _json
+    from pathlib import Path as _Path
+
+    cache_file = _Path("storage/agentic_cache") / ("c" * 64 + ".json")
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    cache_file.write_text(
+        _json.dumps({"result": {"verdict": "verified", "explanation": "Clean.", "reasons": []}})
+    )
+    try:
+        replay = _run(
+            wa_tasks.handle_inbound(
+                {"From": "whatsapp:+911234567890", "Body": "RETRY", "NumMedia": "0"}
+            )
+        )
+    finally:
+        cache_file.unlink(missing_ok=True)
+    assert "Verified" in replay

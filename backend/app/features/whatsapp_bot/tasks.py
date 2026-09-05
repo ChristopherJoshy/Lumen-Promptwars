@@ -141,6 +141,9 @@ async def handle_inbound(payload: dict) -> str:
                 ),
                 url,
             )
+        return await reply(
+            "That case expired from the cache — please resend the photo, video, voice note, or link."
+        )
     if body and sender in _LAST_CASE:
         try:
             answer = await analysis_service.answer_question(_LAST_CASE[sender], body)
