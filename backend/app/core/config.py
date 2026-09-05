@@ -30,9 +30,9 @@ class Settings(BaseSettings):
     agent_max_frames: int = 6
     agent_max_audio_mb: int = 12
     agent_max_audio_s: int = 180
-    llm_api_key: str = ""
-    llm_model: str = ""
     frontend_url: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3000,https://lumen-promptwars.vercel.app"
+    llm_model: str = ""
 
 
 @lru_cache

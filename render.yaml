@@ -17,7 +17,9 @@ services:
       - key: REDIS_URL
         sync: false # Render Key Value, or empty for direct (no-queue) mode
       - key: FRONTEND_URL
-        sync: false # Vercel URL of the frontend
+        value: https://lumen-promptwars.vercel.app
+      - key: CORS_ORIGINS
+        value: https://lumen-promptwars.vercel.app,http://localhost:3000
       - key: OPENCODE_ZEN_API_KEY
         sync: false
       - key: MUSE_MODEL

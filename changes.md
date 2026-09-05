@@ -2,6 +2,25 @@
 
 Format: `## <date> — <scope>` + bullets. Newest first. One line per change.
 
+## 2026-09-05 — forensic graph, voice, scan-lab UI, instant cache, usage
+
+- Local numeric forensics (`agents/forensics.py`: ELA/DCT/noise/copy-move,
+  sha-keyed heatmaps in `storage/forensics/`); visual agent weighs instruments
+- LangGraph cases (`agents/graph.py`: fetch→perceive→retrieve→adjudicate,
+  AsyncSqliteSaver per-content threads; pipeline `analyze_*` are wrappers)
+- Sarvam voice across 22 Indian languages (auto-detect `unknown`, translate
+  mode, transcript ground truth); non-WAV transcoded to 16 kHz mono for Zen
+- Knowledge packs + skills (ai-image/morph/forward tells) feed system prompts;
+  judge applies a score-fusion table; audio prompt covers code-mixing
+- Report API (`/analysis/report/{id}`, `/signals`, `/forensics/{name}`,
+  `/usage`); hex-key validation, allowlisted heatmap streaming
+- Scan-lab frontend: probability dial + bands, reason cards, source chips,
+  voice transcripts, heatmap gallery, scanline intake; report stays server-side
+- Instant repeats: dHash near-dup (Hamming ≤ 8), transcript match for voice,
+  tracker-stripped link keys; MongoDB usage ledger (best-effort, local-off)
+- Deploy: `frontend/vercel.json` (Root Directory `frontend/`), `render.yaml`
+  backend blueprint; live verified: photo verified 0.86, Hindi clip 0.85
+- Suite at 36 passed; `tsc` + `next build` green (6 routes)
 ## 2026-09-05 — agentic verdict pipeline
 
 - Muse Spark 1.3 multiagent pipeline live (`agents/`: muse_client, visual,
