@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     sarvam_base_url: str = "https://api.sarvam.ai"
     sarvam_model: str = "saaras:v3"
     agent_timeout_s: int = 20
+    agent_max_frames: int = 6
+    agent_max_audio_mb: int = 12
+    agent_max_audio_s: int = 180
     llm_api_key: str = ""
     llm_model: str = ""
     frontend_url: str = "http://localhost:3000"
