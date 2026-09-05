@@ -1,0 +1,65 @@
+"""Visual forensics role: pixel artifacts + caption + entities + OCR text."""
+from __future__ import annotations
+
+import base64
+
+from app.features.analysis.agents import muse_client
+
+_SYSTEM = (
+    "You are an image-forensics analyst for Lumen, a misinformation checker. "
+    "Inspect the attached image for signs of AI generation or manipulation: "
+    "compression inconsistencies, lighting/shadow mismatch, anatomical errors "
+    "(hands, faces, teeth), garbled rendered text, over-smooth textures, "
+    "impossible geometry. Also describe what is depicted, name prominent "
+    "entities (people, places, brands, events), and transcribe any visible "
+    "text verbatim. Return JSON ONLY with exactly these keys: "
+    '{"observations": [str], "artifact_score": float 0..1, '
+    '"caption": str, "entities": [str], "ocr_text": str}. '
+    "artifact_score is your suspicion of AI generation/manipulation "
+    "(0 = looks like an ordinary photo, 1 = certainly synthetic)."
+)
+
+
+async def analyze(image_jpeg: bytes) -> dict:
+    """Analyze a normalized JPEG for manipulation artifacts.
+
+    Args:
+        image_jpeg: JPEG bytes (caller normalizes to RGB, >= 64px).
+
+    Returns:
+        Dict with observations, artifact_score, caption, entities, ocr_text.
+
+    Raises:
+        muse_client.MuseError: Zen call failed or returned bad JSON.
+    """
+    if not image_jpeg:
+        raise ValueError("visual.analyze received empty bytes.")
+    b64 = base64.b64encode(image_jpeg).decode()
+    parts = [
+        {
+            "type": "input_text",
+            "text": "Analyze this image. Return JSON only, no commentary.",
+        },
+        {
+            "type": "input_image",
+            "image_url": f"data:image/jpeg;base64,{b64}",
+            "detail": "low",
+        },
+    ]
+    result = await muse_client.respond(_SYSTEM, parts)
+    for key in ("observations", "artifact_score", "caption", "entities", "ocr_text"):
+        if key not in result:
+            raise muse_client.MuseError(f"Visual agent omitted key: {key}")
+    try:
+        result["artifact_score"] = float(result["artifact_score"])
+    except (TypeError, ValueError) as exc:
+        raise muse_client.MuseError("Visual agent artifact_score is not a number.") from exc
+    if not 0.0 <= result["artifact_score"] <= 1.0:
+        raise muse_client.MuseError("Visual agent artifact_score outside 0..1.")
+    return {
+        "observations": list(result["observations"]),
+        "artifact_score": result["artifact_score"],
+        "caption": str(result["caption"]),
+        "entities": list(result["entities"]),
+        "ocr_text": str(result["ocr_text"]),
+    }

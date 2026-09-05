@@ -26,3 +26,9 @@ Checklist for adding any forensic detector (`backend/app/features/analysis/detec
   a fake "uncertain/insufficient evidence" to hide a broken path.
 - Indic-language priority: audio work proves Malayalam/Hindi/Tamil/Telugu
   before English tuning.
+
+## Agentic detectors (v1 note)
+
+Agentic detectors honor the same output contract (`label`, `confidence`,
+`evidence_path`, `model_version`). `evidence_path` points at the JSON
+verdict artifact under `storage/`, not a pixel heatmap.

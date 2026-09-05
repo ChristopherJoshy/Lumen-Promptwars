@@ -15,6 +15,23 @@ cd frontend && npm install && npm run dev
 
 Open http://localhost:3000 (web) and http://localhost:8000/health (api).
 
+## How detection works (agentic-v1)
+
+Six roles, one pipeline (`backend/app/features/analysis/agents/`): visual
+forensics, voice forensics (Malayalam/Hindi/Tamil/Telugu first-class),
+metadata reader, Exa + DDGS web evidence (India hits labeled), temporal
+integrity, and a fusion judge. Per-call budgets: ≤6 low-detail frames, 2000
+output tokens (judge 4096 — reasoning eats the headroom), Exa 5 highlights +
+DDG 5 per query. Supported links: YouTube, Instagram, TikTok, X, Facebook,
+Telegram, generic. WhatsApp parity: image/video/voice-note/link forwards ride
+the identical pipeline
+with `source="whatsapp"` (16 MB cap → "use web upload instead"; web cap 25
+MB; audio 12 MB / 180 s; video 120 s). Unresolved extractions (e.g.
+Instagram/X datacenter blocks) never verify — they cap at
+`insufficient_evidence` with the platform named. Lumen is a probabilistic
+aid, not proof; Zen 429/5xx retries once, quota failures surface loudly,
+DDG flakiness degrades to Exa-only and is recorded in `warnings`.
+
 ## Prod-like stack
 
 ```bash

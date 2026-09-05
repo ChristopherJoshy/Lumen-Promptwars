@@ -27,3 +27,11 @@ def format_verdict(verdict: str, reason: str, report_url: str) -> str:
     parts.append(f"Full evidence: {report_url}")
     parts.append(DISCLAIMER)
     return "\n\n".join(parts)
+
+
+def format_failure() -> str:
+    """Build the honest error reply when analysis cannot finish."""
+    return (
+        "Analysis hit a snag — reply RETRY or use the web upload. "
+        "No verdict was reached, so nothing here is a result.\n\n" + DISCLAIMER
+    )

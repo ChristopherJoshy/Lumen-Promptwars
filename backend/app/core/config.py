@@ -19,6 +19,14 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_whatsapp_number: str = ""
     google_fact_check_api_key: str = ""
+    opencode_zen_api_key: str = ""
+    opencode_zen_base_url: str = "https://opencode.ai/zen/v1"
+    muse_model: str = "muse-spark-1.3-contributor-free"
+    exa_api_key: str = ""
+    agent_timeout_s: int = 20
+    agent_max_frames: int = 6
+    agent_max_audio_mb: int = 12
+    agent_max_audio_s: int = 180
     llm_api_key: str = ""
     llm_model: str = ""
     frontend_url: str = "http://localhost:3000"

@@ -2,6 +2,15 @@
 
 Format: `## <date> — <scope>` + bullets. Newest first. One line per change.
 
+## 2026-09-05 — agentic verdict pipeline
+
+- Muse Spark 1.3 multiagent pipeline live (`agents/`: muse_client, visual,
+  audio Indic-first, meta, searcher Exa+DDGS, temporal, links, judge, pipeline
+  `agentic-v1` with disk cache, temporal override, unresolved-link cap)
+- Detectors delegate (image/video/audio → pipeline, JSON artifact evidence);
+  WhatsApp inbound matrix (image/video/voice-note/link/help) + format_failure
+- Deps: pillow, ddgs, imageio-ffmpeg, yt-dlp; platform matrix 7-way; 23
+  backend tests green (parser tolerance, india hits, override, caps, routing)
 ## 2026-09-05 — design overhaul
 
 - Frontend on latest: Next 16.3.4, React 19.2.8, Tailwind v4, TS 7
