@@ -56,3 +56,13 @@ Format: `## <date> — <scope>` + bullets. Newest first. One line per change.
 - `.gitignore` + `.env.example` files (backend, frontend)
 - Codebase skills: detector-module, commit-conventions, fastapi-feature,
   nextjs-report-page, whatsapp-webhook
+
+## 2026-09-05 — accuracy + hardening + debate display
+
+- Six pixel instruments (ghost + blockiness join ELA/DCT/noise/copy-move)
+- SynthID/origin scan (C2PA, PNG parameters, EXIF generator tags) wired to visual/judge/signals
+- Audio forensics (clip ratio, silence gaps, dynamic range) in voice verdicts
+- Debate critic (single round, judge last word, dissent on report) + temperature 0 + reasoning low
+- Ask-the-agent Q&A grounded in case signals; staged scan status with elapsed time
+- Raw-byte uploads (multipart removed after prod 500), magic-byte sniff gate, 20/min rate limit, security headers, link SSRF guard
+- No-mocks rule in AGENTS.md; suite at 70 passed
