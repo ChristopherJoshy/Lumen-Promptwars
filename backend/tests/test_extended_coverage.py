@@ -255,10 +255,9 @@ def test_reasoning_effort_low_by_default(monkeypatch):
 
     from app.features.analysis.agents import muse_client
 
-    monkeypatch.setattr(muse_client.httpx, "AsyncClient", _CapClient)
-    monkeypatch.setattr(muse_client.settings, "opencode_zen_api_key", "k")
     _run(muse_client.respond("sys", [{"type": "input_text", "text": "hi"}]))
     assert seen.get("reasoning") == {"effort": "low"}
+    assert seen.get("temperature") == 0
 
 
 def _fusion_kwargs():

@@ -66,6 +66,7 @@ async def respond(
     json_only: bool = True,
     max_output_tokens: int = 2000,
     reasoning_effort: str = "low",
+    temperature: float = 0,
 ) -> dict:
     """Call the Zen Responses API and return parsed JSON (or raw text).
 
@@ -76,6 +77,8 @@ async def respond(
         max_output_tokens: Token budget (default 2000; reasoning eats the headroom).
         reasoning_effort: Thinking level; "low" everywhere (probe 2026-09-05:
             the endpoint accepts reasoning.effort and returns 200).
+        temperature: Sampling temperature; 0 for deterministic verdicts
+            (probe 2026-09-05: accepted, echoed back in the response).
 
     Returns:
         Parsed dict when json_only, else ``{"text": ...}``.
@@ -93,6 +96,7 @@ async def respond(
         "input": [{"role": "user", "content": user_parts}],
         "max_output_tokens": max_output_tokens,
         "reasoning": {"effort": reasoning_effort},
+        "temperature": temperature,
     }
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     last_error: str = ""
