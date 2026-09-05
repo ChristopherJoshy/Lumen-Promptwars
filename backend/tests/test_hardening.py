@@ -193,3 +193,46 @@ def test_export_dossier_shape_and_404():
     assert dossier["case_id"] == "case-1"
     assert "not a legal certification" in dossier["disclaimer"]
     assert client.get(f"/api/v1/reports/{'0' * 64}/export").status_code == 404
+
+
+def test_webhook_happy_path(monkeypatch):
+    import base64
+    import hashlib
+    import hmac
+
+    from app.core.config import settings
+    from app.features.whatsapp_bot import router as wa_router
+
+    async def fake_inbound(payload):
+        assert payload["Body"] == "hello"
+        return "reply-text"
+
+    monkeypatch.setattr(settings, "twilio_auth_token", "tok")
+    monkeypatch.setattr(settings, "twilio_webhook_url", "https://x.example.com/wh")
+    monkeypatch.setattr(wa_router, "handle_inbound", fake_inbound)
+    params = {"Body": "hello"}
+    base = "https://x.example.com/wh" + "".join(k + params[k] for k in sorted(params))
+    sig = base64.b64encode(hmac.new(b"tok", base.encode(), hashlib.sha1).digest()).decode()
+    resp = client.post(
+        "/api/v1/whatsapp/webhook", data=params, headers={"X-Twilio-Signature": sig}
+    )
+    assert resp.status_code == 200
+    assert "<Message>reply-text</Message>" in resp.text
+
+
+def test_upload_envelope_shape(monkeypatch):
+    from app.features.analysis.agents import pipeline as agentic
+    from app.features import ingestion as ingestion_pkg
+
+    async def fake_image(data, *, mime, source, claimed_date=None):
+        return {"verdict": "verified", "confidence": 0.9, "case_id": "abc123"}
+
+    monkeypatch.setattr(agentic, "analyze_image", fake_image)
+    resp = client.post(
+        "/api/v1/ingestion/upload",
+        content=b"\xff\xd8\xff" + b"\x00" * 64,
+        headers={"Content-Type": "image/jpeg"},
+    )
+    assert resp.status_code == 200, resp.text[:200]
+    body = resp.json()
+    assert body == {"job_id": "abc123", "case_id": "abc123", "verdict": "verified", "confidence": 0.9}
