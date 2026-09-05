@@ -25,12 +25,12 @@ def _db_path() -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
-
 def _connect() -> sqlite3.Connection:
     conn = sqlite3.connect(str(_db_path()))
+    # dHash is hex text: a 64-bit digest can exceed SQLite's signed INTEGER.
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS hashes "
-        "(dhash INTEGER PRIMARY KEY, case_id TEXT NOT NULL, kind TEXT NOT NULL)"
+        "CREATE TABLE IF NOT EXISTS image_hashes "
+        "(dhash TEXT PRIMARY KEY, case_id TEXT NOT NULL, kind TEXT NOT NULL)"
     )
     conn.execute(
         "CREATE TABLE IF NOT EXISTS transcripts "
@@ -60,6 +60,10 @@ def hamming(a: int, b: int) -> int:
     return bin(a ^ b).count("1")
 
 
+def _hex(digest: int) -> str:
+    return f"{digest:016x}"
+
+
 def lookup_image(image_bytes: bytes) -> str | None:
     """Return the case_id of a near-duplicate analysis, if any."""
     try:
@@ -67,16 +71,15 @@ def lookup_image(image_bytes: bytes) -> str | None:
     except ValueError:
         return None
     with _connect() as conn:
-        # Exact row first (cheap), then a bounded scan for near matches.
         row = conn.execute(
-            "SELECT case_id FROM hashes WHERE dhash = ?", (digest,)
+            "SELECT case_id FROM image_hashes WHERE dhash = ?", (_hex(digest),)
         ).fetchone()
         if row:
             return str(row[0])
         best: str | None = None
         best_dist = HAMMING_CUTOFF + 1
-        for stored, case_id in conn.execute("SELECT dhash, case_id FROM hashes"):
-            dist = hamming(digest, int(stored))
+        for (stored, case_id) in conn.execute("SELECT dhash, case_id FROM image_hashes"):
+            dist = hamming(digest, int(stored, 16))
             if dist < best_dist:
                 best, best_dist = str(case_id), dist
         return best if best_dist <= HAMMING_CUTOFF else None
@@ -91,8 +94,8 @@ def remember_image(image_bytes: bytes, case_id: str, kind: str) -> None:
     try:
         with _connect() as conn:
             conn.execute(
-                "INSERT OR IGNORE INTO hashes (dhash, case_id, kind) VALUES (?, ?, ?)",
-                (digest, case_id, kind),
+                "INSERT OR IGNORE INTO image_hashes (dhash, case_id, kind) VALUES (?, ?, ?)",
+                (_hex(digest), case_id, kind),
             )
             conn.commit()
     except OSError:

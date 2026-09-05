@@ -31,9 +31,8 @@ async def download(media_url: str) -> bytes:
     if not sid or not token:
         raise ValueError("Twilio credentials are not configured.")
     try:
-        async with httpx.AsyncClient(timeout=30, auth=(sid, token)) as client:
+        async with httpx.AsyncClient(timeout=30, auth=(sid, token), follow_redirects=True) as client:
             async with client.stream("GET", media_url) as resp:
-                if resp.status_code >= 400:
                     raise ValueError(f"Media download failed (HTTP {resp.status_code}).")
                 length = resp.headers.get("content-length")
                 if length and int(length) > _MAX_BYTES:

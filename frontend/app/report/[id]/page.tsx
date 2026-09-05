@@ -67,20 +67,19 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             {report.duplicate_of ? ` · near-duplicate of ${report.duplicate_of.slice(0, 12)}` : ""}
           </p>
         </section>
-
         <section aria-label="Export" className="mt-8 rounded-3xl border border-gridline bg-console p-6">
           <h2 className="text-xl font-bold">Need this taken down?</h2>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-fog">
             Export a timestamped, hash-signed dossier formatted for a takedown request under
             India&apos;s IT rules. It documents the analysis — it is not a legal certification.
           </p>
-          <Link
-            href={`/api/v1/reports/${report.case_id}/export`}
+          <a
+            href={`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/v1/reports/${report.case_id}/export`}
             className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-full border border-gridline px-6 text-sm font-semibold transition-colors duration-200 hover:border-scan hover:text-scan"
           >
             <FileDown className="size-4" aria-hidden />
             Export evidentiary report
-          </Link>
+          </a>
         </section>
 
         <div className="mt-8">
