@@ -3,8 +3,9 @@
 /* Lumen dossier theme: monochrome ink + trust blue; verdict colors carry
    the only saturated meaning. Tokens, never raw hex, in components. */
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", "Noto Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Playfair Display", Georgia, serif;
+  --font-lab: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   --color-paper: #f7fafd;
@@ -18,6 +19,19 @@
   --color-verified: #15803d;
   --color-contradiction: #b45309;
   --color-synthetic: #b91c1c;
+
+  /* Forensic lab (dark scan surfaces: report + analyze only). */
+  --color-abyss: #060b14;
+  --color-console: #0b1424;
+  --color-console-2: #101c33;
+  --color-gridline: #1b2b45;
+  --color-foam: #e6eef7;
+  --color-fog: #93a4bc;
+  --color-scan: #22d3ee;
+  --color-lab-verified: #34d399;
+  --color-lab-contradiction: #fbbf24;
+  --color-lab-synthetic: #f87171;
+  --color-fuse-hi: #f59e0b;
 }
 
 html {
@@ -76,9 +90,47 @@ body {
     opacity: 0;
   }
 }
+/* Forensic lab effects: scanline sweep, dial/bars settle, hatch zones. */
+@keyframes lab-sweep {
+  0% { top: -8%; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { top: 104%; opacity: 0; }
+}
 
-.scan-sweep {
-  animation: scan-sweep 3.2s ease-in-out infinite;
+.lab-scanbar {
+  animation: lab-sweep 2.8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.lab-grid {
+  background-image:
+    linear-gradient(var(--color-gridline) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-gridline) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.lab-dial-ring {
+  transition: stroke-dashoffset 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lab-bar-fill {
+  transform-origin: left center;
+  animation: lab-bar-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes lab-bar-in {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.lab-hatch {
+  background-image: repeating-linear-gradient(
+    -45deg, currentColor 0 2px, transparent 2px 7px
+  );
+}
+
+.lab-fused-gradient {
+  background-image: linear-gradient(90deg, #22d3ee, #fbbf24 70%, #f87171);
 }
 
 :focus-visible {
@@ -87,10 +139,18 @@ body {
   border-radius: 2px;
 }
 
+.lab-surface :focus-visible {
+  outline-color: var(--color-scan);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dossier-in,
-  .scan-sweep {
+  .scan-sweep,
+  .lab-scanbar,
+  .lab-dial-ring,
+  .lab-bar-fill {
     animation: none;
+    transition: none;
   }
   html {
     scroll-behavior: auto;
