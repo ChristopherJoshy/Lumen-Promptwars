@@ -27,7 +27,7 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.features.analysis.agents import audio as audio_agent
-from app.features.analysis.agents import judge, links, meta, muse_client, searcher, temporal
+from app.features.analysis.agents import forensics, judge, links, meta, muse_client, searcher, temporal
 from app.features.analysis.agents import visual as visual_agent
 
 PIPELINE_VERSION = "agentic-v1"
@@ -207,6 +207,7 @@ async def _run_tail(
     ocr_text: str,
     claimed_date: str | None,
     source: str,
+    forensics_result: dict | None = None,
 ) -> dict:
     try:
         search_result = await searcher.search(caption, entities, ocr_text)
@@ -226,6 +227,8 @@ async def _run_tail(
         "search": search_result,
         "temporal": temporal_result,
     }
+    if forensics_result is not None:
+        signals["forensics"] = forensics_result
     try:
         fused = await judge.fuse(signals, source)
     except muse_client.MuseError as exc:
@@ -254,10 +257,11 @@ async def analyze_image(
         return hit
     jpeg = _normalize_image(data)
     try:
-        perceptual, meta_info = await asyncio.gather(
-            visual_agent.analyze(jpeg),
+        tools, meta_info = await asyncio.gather(
+            asyncio.to_thread(forensics.examine, data),
             asyncio.to_thread(meta.read, data, mime),
         )
+        perceptual = await visual_agent.analyze(jpeg, tool_data=tools)
     except muse_client.MuseError as exc:
         raise AnalysisError(f"Visual analysis failed: {exc}") from exc
     except ValueError as exc:
@@ -271,6 +275,7 @@ async def analyze_image(
         ocr_text=perceptual.get("ocr_text", ""),
         claimed_date=claimed_date,
         source=source,
+        forensics_result=tools,
     )
     _cache_put(cache_key, result)
     return result
@@ -295,13 +300,31 @@ async def analyze_video(
         raise AnalysisError(f"Video is {duration:.0f}s, over the {_VIDEO_MAX_S}s cap.")
     frames = await asyncio.to_thread(_extract_frames, data, settings.agent_max_frames)
     try:
+        frame_tools = list(
+            await asyncio.gather(*[asyncio.to_thread(forensics.examine, f) for f in frames])
+        )
         per_frame = list(
-            await asyncio.gather(*[visual_agent.analyze(frame) for frame in frames])
+            await asyncio.gather(
+                *[visual_agent.analyze(frame, tool_data=tools) for frame, tools in zip(frames, frame_tools)]
+            )
         )
     except muse_client.MuseError as exc:
         raise AnalysisError(f"Video frame analysis failed: {exc}") from exc
+    except ValueError as exc:
+        raise AnalysisError(str(exc)) from exc
     mean_score = sum(f["artifact_score"] for f in per_frame) / len(per_frame)
     best = max(per_frame, key=lambda f: f["artifact_score"])
+    fused_means = [float((t.get("scores") or {}).get("fused_mean", 0.0)) for t in frame_tools]
+    agg_scores = {
+        name: round(sum(float((t.get("scores") or {}).get(name, 0.0)) for t in frame_tools) / len(frame_tools), 3)
+        for name in ("ela", "dct", "noise", "copymove", "fused_mean")
+    }
+    worst_tools = frame_tools[max(range(len(frame_tools)), key=lambda i: fused_means[i])]
+    video_tools = {
+        "scores": agg_scores,
+        "artifacts": worst_tools.get("artifacts", {}),
+        "note": f"Mean over {len(frames)} frames; heatmaps from the worst frame.",
+    }
     observations: list[str] = []
     entities: list[str] = []
     for frame in per_frame:
@@ -324,6 +347,7 @@ async def analyze_video(
         ocr_text=perceptual["ocr_text"],
         claimed_date=claimed_date,
         source=source,
+        forensics_result=video_tools,
     )
     _cache_put(cache_key, result)
     return result

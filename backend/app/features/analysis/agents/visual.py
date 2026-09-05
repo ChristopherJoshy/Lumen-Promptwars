@@ -20,12 +20,14 @@ _SYSTEM = (
 )
 
 
-async def analyze(image_jpeg: bytes) -> dict:
+async def analyze(image_jpeg: bytes, tool_data: dict | None = None) -> dict:
     """Analyze a normalized JPEG for manipulation artifacts.
 
     Args:
         image_jpeg: JPEG bytes (caller normalizes to RGB, >= 64px).
-
+        tool_data: optional forensics.examine() output; instrument scores are
+            injected as trusted readings the model must weigh above eyeballing.
+ 
     Returns:
         Dict with observations, artifact_score, caption, entities, ocr_text.
 
@@ -35,10 +37,19 @@ async def analyze(image_jpeg: bytes) -> dict:
     if not image_jpeg:
         raise ValueError("visual.analyze received empty bytes.")
     b64 = base64.b64encode(image_jpeg).decode()
+    user_text = "Analyze this image. Return JSON only, no commentary."
+    if tool_data:
+        scores = (tool_data.get("scores") or {})
+        user_text += (
+            " Instrument readings (local forensic tools — trust over eyes): "
+            + ", ".join(f"{k}={scores.get(k, '?')}" for k in ("ela", "dct", "noise", "copymove"))
+            + f"; fused={scores.get('fused_mean', '?')}. Scores near 0 mean clean, "
+            "near 1 mean tampered. Weigh them above your own eyeballing."
+        )
     parts = [
         {
             "type": "input_text",
-            "text": "Analyze this image. Return JSON only, no commentary.",
+            "text": user_text,
         },
         {
             "type": "input_image",
