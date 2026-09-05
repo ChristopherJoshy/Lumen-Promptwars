@@ -313,6 +313,7 @@ def test_whatsapp_conversation_remembers_and_answers(monkeypatch):
     monkeypatch.setattr("app.features.analysis.service.answer_question", fake_answer)
     monkeypatch.setattr("app.features.whatsapp_bot.client.send_verdict", fake_send)
     wa_tasks._LAST_CASE.clear()
+    wa_tasks._RECENT.clear()
     sender = {"From": "whatsapp:+911234567890", "Body": "https://youtu.be/abc", "NumMedia": "0"}
     _run(wa_tasks.handle_inbound(sender))
     assert wa_tasks._LAST_CASE.get("whatsapp:+911234567890") == "c" * 64
@@ -375,6 +376,7 @@ def test_whatsapp_image_flow_ack_then_summary_link(monkeypatch):
     monkeypatch.setattr("app.features.analysis.agents.pipeline.analyze_image", fake_image)
     monkeypatch.setattr("app.features.whatsapp_bot.client.send_verdict", fake_send)
     wa_tasks._LAST_CASE.clear()
+    wa_tasks._RECENT.clear()
     out = _run(
         wa_tasks.handle_inbound(
             {

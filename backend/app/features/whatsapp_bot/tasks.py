@@ -50,9 +50,8 @@ def _first_sentence(text: str) -> str:
         if sep in text:
             return text.split(sep)[0].strip().rstrip(".!?") + "."
     return text[:280]
-
-
 _LAST_CASE: dict[str, str] = {}
+_RECENT: dict[str, float] = {}
 
 
 async def handle_inbound(payload: dict) -> str:
@@ -80,6 +79,16 @@ async def handle_inbound(payload: dict) -> str:
     body = str(payload.get("Body", "") or "").strip()
     content_type = _pick_content_type(payload)
     media_url = str(payload.get("MediaUrl0", "") or "")
+
+    import time as _time
+
+    fingerprint = ""
+    if content_type or body.startswith(("http://", "https://")):
+        fingerprint = f"{sender}|{content_type}|{media_url}|{body[:200]}"
+        last = _RECENT.get(fingerprint, 0.0)
+        if _time.monotonic() - last < 60.0:
+            return "(duplicate submission ignored)"
+        _RECENT[fingerprint] = _time.monotonic()
 
     import logging
 

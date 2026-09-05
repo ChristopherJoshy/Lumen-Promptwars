@@ -27,6 +27,8 @@ async def send_verdict(to: str, text: str, report_url: str) -> None:
     sender = re.sub(r"[\s\-()]", "", sender)
     if not sender.startswith("whatsapp:"):
         sender = "whatsapp:+" + sender.lstrip("+")
+    if to == sender:
+        return  # Twilio forbids messaging the sandbox number itself (63031).
     url = f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json"
     try:
         async with httpx.AsyncClient(timeout=20, auth=(sid, token)) as client:
