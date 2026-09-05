@@ -334,3 +334,26 @@ def test_debate_critic_failure_keeps_proposal(monkeypatch):
     assert out["verdict"] == "verified"
     assert "skipped" in out["signals"]["debate"]["note"]
 
+
+
+def test_spectrum_midband_depletion():
+    from PIL import Image as PILImage
+
+    rng = np.random.default_rng(11)
+    noise = rng.normal(128, 20, (256, 256))
+    full = np.abs(np.fft.fftshift(np.fft.fft2(noise - noise.mean())))
+    h, w = noise.shape
+    yy, xx = np.mgrid[:h, :w]
+    r = np.sqrt((yy - h / 2) ** 2 + (xx - w / 2) ** 2)
+    rmax = np.sqrt((h / 2) ** 2 + (w / 2) ** 2)
+    mask = ~((r >= 0.33 * rmax) & (r < 0.66 * rmax))
+    depleted = np.abs(np.fft.ifft2(np.fft.ifftshift(full * mask))).astype("uint8")
+
+    def _png_of(arr):
+        buf = io.BytesIO()
+        PILImage.fromarray(np.stack([arr] * 3, axis=2)).save(buf, "PNG")
+        return buf.getvalue()
+
+    plain = forensics.spectrum(_png_of(noise.clip(0, 255).astype("uint8")))["score"]
+    starved = forensics.spectrum(_png_of(depleted))["score"]
+    assert starved > plain
