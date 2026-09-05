@@ -1,9 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Link2, ScanLine, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ProgressStream } from "@/components/progress-stream";
 import { submitLink, uploadFile } from "@/features/analysis/api";
 import { cn } from "@/lib/utils";
 
@@ -30,13 +30,22 @@ function validate(file: File): string | null {
 }
 
 export default function AnalyzePage() {
+  const router = useRouter();
   const [url, setUrl] = useState("");
-  const [jobId, setJobId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [fileName, setFileName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  function goReport(res: unknown) {
+    const caseId =
+      res && typeof res === "object" && "case_id" in res && typeof res.case_id === "string"
+        ? res.case_id
+        : "";
+    if (caseId) router.push(`/report/${caseId}`);
+    else setNotice("Analysis finished but returned no report — try again.");
+  }
 
   async function submit(file: File) {
     const problem = validate(file);
@@ -48,8 +57,7 @@ export default function AnalyzePage() {
     setNotice("");
     setFileName(file.name);
     try {
-      const res = await uploadFile(file);
-      setJobId((res as { job_id?: string }).job_id ?? "local-preview");
+      goReport(await uploadFile(file));
     } catch {
       setNotice("Upload failed — check the file type and try again.");
     } finally {
@@ -64,8 +72,7 @@ export default function AnalyzePage() {
     setNotice("");
     setFileName(url.trim());
     try {
-      const res = await submitLink(url);
-      setJobId((res as { job_id?: string }).job_id ?? "local-preview");
+      goReport(await submitLink(url));
     } catch {
       setNotice(
         "Couldn't fetch this link automatically — try downloading the media and uploading it directly.",
@@ -164,8 +171,6 @@ export default function AnalyzePage() {
               {notice}
             </p>
           )}
-
-          <ProgressStream jobId={jobId} />
         </div>
       </main>
     </div>

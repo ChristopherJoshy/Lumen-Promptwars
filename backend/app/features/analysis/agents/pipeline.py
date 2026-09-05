@@ -337,6 +337,7 @@ async def analyze_image(
         claimed_date=claimed_date,
         thread_id=cache_key,
     )
+    result["case_id"] = cache_key
     _cache_put(cache_key, result)
     near_dup.remember_image(data, cache_key, "image")
     await _log_usage(result, modality="image", source=source, case_id=cache_key)
@@ -369,6 +370,7 @@ async def analyze_video(
         claimed_date=claimed_date,
         thread_id=cache_key,
     )
+    result["case_id"] = cache_key
     _cache_put(cache_key, result)
     for frame in probe_frames:
         near_dup.remember_image(frame, cache_key, "video")
@@ -410,6 +412,7 @@ async def analyze_audio(
         thread_id=cache_key,
         pre_sarvam=pre_sarvam,
     )
+    result["case_id"] = cache_key
     _cache_put(cache_key, result)
     transcript = ((result.get("signals", {}).get("sarvam") or {}).get("result") or {}).get("transcript", "")
     await asyncio.to_thread(near_dup.remember_transcript, transcript, cache_key)
@@ -448,6 +451,7 @@ async def analyze_link(url: str, *, source: str) -> dict:
             sha256=hashlib.sha256(url.encode()).hexdigest(),
             caption=caption_seed[:500],
         )
+        result["case_id"] = cache_key
         _cache_put(cache_key, result)
         await _log_usage(result, modality="link", source=source, case_id=cache_key)
         return result

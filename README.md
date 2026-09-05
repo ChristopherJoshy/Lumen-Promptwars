@@ -4,6 +4,9 @@ Check suspicious media (image, audio, video, link, WhatsApp forward) for
 signs of AI generation or manipulation. Indic-languages-first, WhatsApp as a
 first-class intake, Indian fact-checkers first.
 
+Live: frontend https://lumen-promptwars.vercel.app ·
+API https://lumen-promptwars.onrender.com (`/health`, `/api/v1/...`).
+
 ## Quickstart (no Docker)
 
 ```bash
@@ -45,12 +48,11 @@ docker compose up
 `skills/*` (codebase checklists), `AGENTS.md` (agent instructions),
 `planning.md` (build order), `changes.md` (changelog).
 
-## Known limitations (v1 skeleton)
+## Known limitations
 
-- Detectors not yet implemented (audio first, checkpoint 5); pipeline stubs
-  raise `NotImplementedError` loudly rather than faking verdicts.
+- Submissions run inline (no queue yet): typical image ~30 s; large videos
+  may exceed the 60 s free-tier request cap — use short clips for now.
 - Instagram/X extraction reliability depends on datacenter blocks; failures
   return a clear "upload directly instead" error, never a silent hang.
 - WhatsApp runs against Twilio's sandbox number: each tester must send the
   one-time join code before messaging it.
-- Video detector is a stretch goal; maturity will lag audio/image.
