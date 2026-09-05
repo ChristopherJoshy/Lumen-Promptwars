@@ -16,6 +16,7 @@ run searcher-only on title/description/URL.
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import io
 import json
@@ -23,9 +24,38 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-
 from app.core.config import settings
-from app.features.analysis.agents import judge, links, muse_client, searcher, temporal
+from app.features.analysis.agents import judge, links, muse_client, near_dup, sarvam, searcher, temporal
+
+_TRACKER_PARAMS = frozenset(
+    {"fbclid", "gclid", "si", "spm", "ref", "ref_src", "igshid", "mc_cid", "mc_eid"}
+)
+
+
+def _canonical_link(url: str) -> str:
+    """Strip tracking params + fragments so shares of one link share a key."""
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+    parts = urlsplit(url.strip())
+    kept = [
+        (k, v)
+        for k, v in parse_qsl(parts.query)
+        if k.lower() not in _TRACKER_PARAMS and not k.lower().startswith("utm_")
+    ]
+    return urlunsplit((parts.scheme, parts.netloc.lower(), parts.path or "/", urlencode(kept), ""))
+
+
+def _near_hit(case_id: str | None) -> dict | None:
+    """Return the original verdict marked near-duplicate, if still cached."""
+    if not case_id:
+        return None
+    hit = _cache_get(case_id)
+    if hit is None:
+        return None
+    hit = dict(hit)
+    hit["cached"] = "near-duplicate"
+    hit["duplicate_of"] = case_id
+    return hit
 
 _SARVAM_EXT = {
     "audio/mpeg": "audio.mp3",
@@ -282,6 +312,8 @@ async def analyze_image(
     cache_key = hashlib.sha256(f"{settings.muse_model}@{PIPELINE_VERSION}:img:".encode() + data).hexdigest()
     if hit := _cache_get(cache_key):
         return hit
+    if near := _near_hit(await asyncio.to_thread(near_dup.lookup_image, data)):
+        return near
     from app.features.analysis.agents import graph  # lazy: graph imports pipeline
 
     result = await graph.run_case(
@@ -293,6 +325,7 @@ async def analyze_image(
         thread_id=cache_key,
     )
     _cache_put(cache_key, result)
+    near_dup.remember_image(data, cache_key, "image")
     return result
 
 
@@ -306,6 +339,12 @@ async def analyze_video(
     cache_key = hashlib.sha256(f"{settings.muse_model}@{PIPELINE_VERSION}:vid:".encode() + data).hexdigest()
     if hit := _cache_get(cache_key):
         return hit
+    # Local frame extract for the instant path; the graph re-extracts on a
+    # miss (~1s ffmpeg) — documented cost of keeping bytes out of state.
+    probe_frames = await asyncio.to_thread(_extract_frames, data, settings.agent_max_frames)
+    for frame in probe_frames:
+        if near := _near_hit(await asyncio.to_thread(near_dup.lookup_image, frame)):
+            return near
     from app.features.analysis.agents import graph  # lazy: graph imports pipeline
 
     result = await graph.run_case(
@@ -317,9 +356,10 @@ async def analyze_video(
         thread_id=cache_key,
     )
     _cache_put(cache_key, result)
+    for frame in probe_frames:
+        near_dup.remember_image(frame, cache_key, "video")
+    _cache_put(cache_key, result)
     return result
-
-
 
 
 async def analyze_audio(
@@ -334,6 +374,19 @@ async def analyze_audio(
         return hit
     from app.features.analysis.agents import graph  # lazy: graph imports pipeline
 
+    # One STT call up front: a repeated viral voice note matches on its
+    # transcript and skips the judge/search entirely. Misses reuse the
+    # transcript inside the graph (no double STT).
+    pre_sarvam = None
+    if settings.sarvam_api_key:
+        try:
+            pre_sarvam = await sarvam.transcribe(data, filename=_sarvam_filename(mime))
+            if near := _near_hit(
+                await asyncio.to_thread(near_dup.lookup_transcript, pre_sarvam.get("transcript", ""))
+            ):
+                return near
+        except sarvam.SarvamError:
+            pre_sarvam = None
     result = await graph.run_case(
         modality="audio",
         data=data,
@@ -341,8 +394,11 @@ async def analyze_audio(
         source=source,
         claimed_date=claimed_date,
         thread_id=cache_key,
+        pre_sarvam=pre_sarvam,
     )
     _cache_put(cache_key, result)
+    transcript = ((result.get("signals", {}).get("sarvam") or {}).get("result") or {}).get("transcript", "")
+    await asyncio.to_thread(near_dup.remember_transcript, transcript, cache_key)
     return result
 
 
@@ -352,7 +408,7 @@ async def analyze_link(url: str, *, source: str) -> dict:
     if not url.startswith(("http://", "https://")):
         raise AnalysisError("Link must start with http(s)://")
     cache_key = hashlib.sha256(
-        f"{settings.muse_model}@{PIPELINE_VERSION}:link:{url}".encode()
+        f"{settings.muse_model}@{PIPELINE_VERSION}:link:{_canonical_link(url)}".encode()
     ).hexdigest()
     if hit := _cache_get(cache_key):
         return hit

@@ -58,6 +58,7 @@ async def run_case(
     source: str,
     claimed_date: str | None,
     thread_id: str,
+    pre_sarvam: dict | None = None,
 ) -> dict:
     """Run one case through the graph; returns the shaped verdict dict."""
     ctx = {"data": data, "mime": mime, "frames": [], "frame_tools": []}
@@ -101,15 +102,15 @@ async def run_case(
             }
             return {"meta": meta_info, "tool": tool, "errors": warnings}
         if modality == "audio":
-            sarvam_result = None
-            if settings.sarvam_api_key:
+            sarvam_result = pre_sarvam
+            if sarvam_result is None and settings.sarvam_api_key:
                 try:
                     sarvam_result = await sarvam.transcribe(
                         ctx["data"], filename=pipeline._sarvam_filename(ctx["mime"])
                     )
                 except sarvam.SarvamError as exc:
                     warnings.append(f"sarvam degraded to Muse-only: {exc}")
-            else:
+            elif sarvam_result is None:
                 warnings.append("sarvam skipped: no key")
             try:
                 meta_info = await asyncio.to_thread(meta.read, ctx["data"], ctx["mime"])
