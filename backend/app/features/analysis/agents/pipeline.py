@@ -16,7 +16,6 @@ run searcher-only on title/description/URL.
 """
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import io
 import json
@@ -26,9 +25,7 @@ import time
 from pathlib import Path
 
 from app.core.config import settings
-from app.features.analysis.agents import audio as audio_agent
-from app.features.analysis.agents import forensics, judge, links, meta, muse_client, sarvam, searcher, temporal
-from app.features.analysis.agents import visual as visual_agent
+from app.features.analysis.agents import judge, links, muse_client, searcher, temporal
 
 _SARVAM_EXT = {
     "audio/mpeg": "audio.mp3",
@@ -209,26 +206,35 @@ def _shape_result(
     }
 
 
-async def _run_tail(
+async def run_search(*, caption: str, entities: list[str], ocr_text: str) -> dict:
+    """Context-retrieval stage: Exa + DDG evidence for the tail."""
+    try:
+        return await searcher.search(caption, entities, ocr_text)
+    except Exception as exc:
+        raise AnalysisError(f"Search failed: {exc}") from exc
+
+
+async def run_fusion(
     *,
     modality: str,
     perceptual: dict,
     meta_info: dict,
-    caption: str,
-    entities: list[str],
-    ocr_text: str,
+    search_result: dict,
     claimed_date: str | None,
     source: str,
     forensics_result: dict | None = None,
+    sarvam_entry: dict | None = None,
+    meta_dates: dict | None = None,
+    unresolved_platform: str | None = None,
+    sha256: str = "",
+    caption: str = "",
 ) -> dict:
-    try:
-        search_result = await searcher.search(caption, entities, ocr_text)
-    except Exception as exc:
-        raise AnalysisError(f"Search failed: {exc}") from exc
-    meta_dates = {
-        "exif_date": (meta_info.get("exif") or {}).get("306"),
-        "upload_date": meta_info.get("upload_date"),
-    }
+    """Fusion stage: temporal check + judge + overrides, shaped for callers."""
+    if meta_dates is None:
+        meta_dates = {
+            "exif_date": (meta_info.get("exif") or {}).get("306"),
+            "upload_date": meta_info.get("upload_date"),
+        }
     temporal_result = temporal.check(
         meta_dates, search_result.get("exa_hits", []) + search_result.get("ddg_hits", []), claimed_date
     )
@@ -241,10 +247,19 @@ async def _run_tail(
     }
     if forensics_result is not None:
         signals["forensics"] = forensics_result
+    if sarvam_entry is not None:
+        signals["sarvam"] = sarvam_entry
     try:
         fused = await judge.fuse(signals, source)
     except muse_client.MuseError as exc:
         raise AnalysisError(f"Fusion failed: {exc}") from exc
+    if unresolved_platform and fused.get("verdict") == "verified":
+        fused = dict(fused)
+        fused["verdict"] = "insufficient_evidence"
+        fused["reasons"] = list(fused.get("reasons", [])) + [
+            f"Unresolved extraction ({unresolved_platform}): "
+            "no bytes to inspect, so verification is impossible."
+        ]
     fused = _apply_temporal_override(fused, temporal_result)
     return _shape_result(
         verdict=fused["verdict"],
@@ -252,7 +267,7 @@ async def _run_tail(
         explanation=fused["explanation"],
         reasons=fused["reasons"],
         signals=signals,
-        sha256=meta_info.get("sha256", ""),
+        sha256=sha256 or str(meta_info.get("sha256", "")),
         caption=caption,
     )
 
@@ -260,34 +275,22 @@ async def _run_tail(
 async def analyze_image(
     data: bytes, *, mime: str, source: str, claimed_date: str | None = None
 ) -> dict:
-    """Run the full image pipeline: visual + meta -> search -> judge."""
+    """Image verdicts via the case graph; signature frozen for callers."""
     if mime not in _IMAGE_MIMES:
         raise AnalysisError(f"Unsupported image MIME: {mime}")
     _guard_bytes(data, source=source, kind="image")
     cache_key = hashlib.sha256(f"{settings.muse_model}@{PIPELINE_VERSION}:img:".encode() + data).hexdigest()
     if hit := _cache_get(cache_key):
         return hit
-    jpeg = _normalize_image(data)
-    try:
-        tools, meta_info = await asyncio.gather(
-            asyncio.to_thread(forensics.examine, data),
-            asyncio.to_thread(meta.read, data, mime),
-        )
-        perceptual = await visual_agent.analyze(jpeg, tool_data=tools)
-    except muse_client.MuseError as exc:
-        raise AnalysisError(f"Visual analysis failed: {exc}") from exc
-    except ValueError as exc:
-        raise AnalysisError(str(exc)) from exc
-    result = await _run_tail(
+    from app.features.analysis.agents import graph  # lazy: graph imports pipeline
+
+    result = await graph.run_case(
         modality="image",
-        perceptual=perceptual,
-        meta_info=meta_info,
-        caption=perceptual.get("caption", ""),
-        entities=perceptual.get("entities", []),
-        ocr_text=perceptual.get("ocr_text", ""),
-        claimed_date=claimed_date,
+        data=data,
+        mime=mime,
         source=source,
-        forensics_result=tools,
+        claimed_date=claimed_date,
+        thread_id=cache_key,
     )
     _cache_put(cache_key, result)
     return result
@@ -296,119 +299,49 @@ async def analyze_image(
 async def analyze_video(
     data: bytes, *, mime: str, source: str, claimed_date: str | None = None
 ) -> dict:
-    """Run the video pipeline: N frame visuals aggregated, then the image tail."""
+    """Video verdicts via the case graph; signature frozen for callers."""
     if mime not in _VIDEO_MIMES:
         raise AnalysisError(f"Unsupported video MIME: {mime}")
     _guard_bytes(data, source=source, kind="video")
     cache_key = hashlib.sha256(f"{settings.muse_model}@{PIPELINE_VERSION}:vid:".encode() + data).hexdigest()
     if hit := _cache_get(cache_key):
         return hit
-    try:
-        meta_info = await asyncio.to_thread(meta.read, data, mime)
-    except ValueError as exc:
-        raise AnalysisError(str(exc)) from exc
-    duration = meta_info.get("duration_s")
-    if duration and duration > _VIDEO_MAX_S:
-        raise AnalysisError(f"Video is {duration:.0f}s, over the {_VIDEO_MAX_S}s cap.")
-    frames = await asyncio.to_thread(_extract_frames, data, settings.agent_max_frames)
-    try:
-        frame_tools = list(
-            await asyncio.gather(*[asyncio.to_thread(forensics.examine, f) for f in frames])
-        )
-        per_frame = list(
-            await asyncio.gather(
-                *[visual_agent.analyze(frame, tool_data=tools) for frame, tools in zip(frames, frame_tools)]
-            )
-        )
-    except muse_client.MuseError as exc:
-        raise AnalysisError(f"Video frame analysis failed: {exc}") from exc
-    except ValueError as exc:
-        raise AnalysisError(str(exc)) from exc
-    mean_score = sum(f["artifact_score"] for f in per_frame) / len(per_frame)
-    best = max(per_frame, key=lambda f: f["artifact_score"])
-    fused_means = [float((t.get("scores") or {}).get("fused_mean", 0.0)) for t in frame_tools]
-    agg_scores = {
-        name: round(sum(float((t.get("scores") or {}).get(name, 0.0)) for t in frame_tools) / len(frame_tools), 3)
-        for name in ("ela", "dct", "noise", "copymove", "fused_mean")
-    }
-    worst_tools = frame_tools[max(range(len(frame_tools)), key=lambda i: fused_means[i])]
-    video_tools = {
-        "scores": agg_scores,
-        "artifacts": worst_tools.get("artifacts", {}),
-        "note": f"Mean over {len(frames)} frames; heatmaps from the worst frame.",
-    }
-    observations: list[str] = []
-    entities: list[str] = []
-    for frame in per_frame:
-        observations.extend(frame.get("observations", []))
-        entities.extend(frame.get("entities", []))
-    perceptual = {
-        "observations": observations,
-        "artifact_score": mean_score,
-        "caption": best.get("caption", ""),
-        "entities": sorted(set(entities)),
-        "ocr_text": " ".join(f.get("ocr_text", "") for f in per_frame).strip(),
-        "frames": len(per_frame),
-    }
-    result = await _run_tail(
+    from app.features.analysis.agents import graph  # lazy: graph imports pipeline
+
+    result = await graph.run_case(
         modality="video",
-        perceptual=perceptual,
-        meta_info=meta_info,
-        caption=perceptual["caption"],
-        entities=perceptual["entities"],
-        ocr_text=perceptual["ocr_text"],
-        claimed_date=claimed_date,
+        data=data,
+        mime=mime,
         source=source,
-        forensics_result=video_tools,
+        claimed_date=claimed_date,
+        thread_id=cache_key,
     )
     _cache_put(cache_key, result)
     return result
 
 
+
+
 async def analyze_audio(
     data: bytes, *, mime: str, source: str, claimed_date: str | None = None
 ) -> dict:
-    """Run the audio pipeline: voice forensics + meta -> search -> judge."""
+    """Audio verdicts via the case graph; signature frozen for callers."""
     if mime not in _AUDIO_MIMES:
         raise AnalysisError(f"Unsupported audio MIME: {mime}")
     _guard_bytes(data, source=source, kind="audio")
     cache_key = hashlib.sha256(f"{settings.muse_model}@{PIPELINE_VERSION}:aud:".encode() + data).hexdigest()
     if hit := _cache_get(cache_key):
         return hit
-    sarvam_result: dict | None = None
-    sarvam_warning: str | None = None
-    if settings.sarvam_api_key:
-        try:
-            sarvam_result = await sarvam.transcribe(data, filename=_sarvam_filename(mime))
-        except sarvam.SarvamError as exc:
-            sarvam_warning = f"sarvam degraded to Muse-only: {exc}"
-    else:
-        sarvam_warning = "sarvam skipped: no key"
-    try:
-        perceptual, meta_info = await asyncio.gather(
-            audio_agent.analyze(data, mime, sarvam_hint=sarvam_result),
-            asyncio.to_thread(meta.read, data, mime),
-        )
-    except muse_client.MuseError as exc:
-        raise AnalysisError(f"Audio analysis failed: {exc}") from exc
-    except ValueError as exc:
-        raise AnalysisError(str(exc)) from exc
-    duration = meta_info.get("duration_s")
-    if duration and duration > settings.agent_max_audio_s:
-        raise AnalysisError(
-            f"Audio is {duration:.0f}s, over the {settings.agent_max_audio_s}s cap."
-        )
-    result = await _run_tail(
+    from app.features.analysis.agents import graph  # lazy: graph imports pipeline
+
+    result = await graph.run_case(
         modality="audio",
-        perceptual=perceptual,
-        meta_info=meta_info,
-        caption=perceptual.get("transcript_hint", ""),
-        entities=perceptual.get("entities", []),
-        ocr_text=perceptual.get("transcript_hint", ""),
-        claimed_date=claimed_date,
+        data=data,
+        mime=mime,
         source=source,
+        claimed_date=claimed_date,
+        thread_id=cache_key,
     )
-    result["signals"]["sarvam"] = {"result": sarvam_result, "warning": sarvam_warning}
     _cache_put(cache_key, result)
     return result
 
@@ -430,40 +363,18 @@ async def analyze_link(url: str, *, source: str) -> dict:
         title = str(metadata.get("title") or "")
         desc = str(metadata.get("description") or "")
         caption_seed = " ".join([title, desc, url])[:2000]
-        try:
-            search_result = await searcher.search(caption_seed, [], caption_seed)
-        except Exception as exc:
-            raise AnalysisError(f"Search failed: {exc}") from exc
-        temporal_result = temporal.check(
-            {"upload_date": metadata.get("upload_date")},
-            search_result.get("exa_hits", []) + search_result.get("ddg_hits", []),
-            metadata.get("upload_date"),
+        search_result = await run_search(
+            caption=caption_seed, entities=[], ocr_text=caption_seed
         )
-        signals = {
-            "modality": "link",
-            "perceptual": {"note": resolved.get("note", "")},
-            "meta": {"url": url, **metadata},
-            "search": search_result,
-            "temporal": temporal_result,
-        }
-        try:
-            fused = await judge.fuse(signals, source)
-        except muse_client.MuseError as exc:
-            raise AnalysisError(f"Fusion failed: {exc}") from exc
-        if fused.get("verdict") == "verified":
-            fused = dict(fused)
-            fused["verdict"] = "insufficient_evidence"
-            fused["reasons"] = list(fused.get("reasons", [])) + [
-                f"Unresolved extraction ({metadata.get('platform', 'unknown')}): "
-                "no bytes to inspect, so verification is impossible."
-            ]
-        fused = _apply_temporal_override(fused, temporal_result)
-        result = _shape_result(
-            verdict=fused["verdict"],
-            confidence=fused["confidence"],
-            explanation=fused["explanation"],
-            reasons=fused["reasons"],
-            signals=signals,
+        result = await run_fusion(
+            modality="link",
+            perceptual={"note": resolved.get("note", "")},
+            meta_info={"url": url, **metadata},
+            search_result=search_result,
+            claimed_date=metadata.get("upload_date"),
+            source=source,
+            meta_dates={"upload_date": metadata.get("upload_date")},
+            unresolved_platform=str(metadata.get("platform", "unknown")),
             sha256=hashlib.sha256(url.encode()).hexdigest(),
             caption=caption_seed[:500],
         )
