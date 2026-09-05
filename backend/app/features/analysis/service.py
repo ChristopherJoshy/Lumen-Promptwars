@@ -10,9 +10,45 @@ import json
 import re
 from pathlib import Path
 
-_CASE_RE = re.compile(r"^[0-9a-f]{64}$")
-_FORENSIC_NAMES = ("ela", "dct", "noise", "copymove")
 
+async def answer_question(case_id: str, question: str) -> str:
+    """Answer one grounded follow-up about a cached case.
+
+    Raises ValueError on unknown cases, empty/oversize questions, or an
+    unparsable model answer. Shared by the web ask route and WhatsApp
+    conversations — one implementation, no duplicated prompts.
+    """
+    from app.features.analysis.agents import muse_client
+
+    case = get_case(case_id)
+    if case is None:
+        raise ValueError("Unknown or expired case.")
+    question = question.strip()
+    if not question:
+        raise ValueError("Ask a non-empty question.")
+    if len(question) > 500:
+        raise ValueError("Keep the question under 500 characters.")
+    system = (
+        "You answer follow-up questions about one Lumen media-verdict report. "
+        "Ground every claim in the case JSON below; say 'not in this report' "
+        "when the answer is not there. Plain language, 2-5 sentences, no new "
+        "verdict. Return JSON ONLY: {\"answer\": str}."
+    )
+    try:
+        result = await muse_client.respond(
+            system,
+            [{"type": "input_text", "text": f"question: {question}\ncase: {json.dumps(case, default=str)[:6000]}"}],
+            max_output_tokens=800,
+        )
+    except muse_client.MuseError as exc:
+        raise ValueError(f"Answer failed: {exc}") from exc
+    if "answer" not in result:
+        raise ValueError("Answer came back unparsable.")
+    return str(result["answer"])
+
+
+_CASE_RE = re.compile(r"^[0-9a-f]{64}$")
+_FORENSIC_NAMES = ("ela", "dct", "noise", "copymove", "ghost", "blockiness")
 
 def _cache_path(case_id: str) -> Path | None:
     if not _CASE_RE.match(case_id):

@@ -24,9 +24,12 @@ def valid_twilio_signature(url: str, params: dict[str, str], signature: str, tok
     base = url + "".join(key + params[key] for key in sorted(params))
     digest = hmac.new(token.encode(), base.encode(), hashlib.sha1).digest()
     return hmac.compare_digest(base64.b64encode(digest).decode(), signature)
+
+
 HELP_TEXT = (
     "Send a photo, video, voice note, or paste a link and Lumen will check it. "
-    "For files over 16 MB, use the web upload instead."
+    "For files over 16 MB, use the web upload instead. "
+    "After a verdict, just reply with questions about it."
 )
 
 
@@ -49,6 +52,9 @@ def _first_sentence(text: str) -> str:
     return text[:280]
 
 
+_LAST_CASE: dict[str, str] = {}
+
+
 async def handle_inbound(payload: dict) -> str:
     """Route one inbound Twilio webhook payload through the pipeline.
 
@@ -56,14 +62,19 @@ async def handle_inbound(payload: dict) -> str:
         payload: Twilio form fields (From, Body, NumMedia, MediaUrl0,
             MediaContentType0).
 
+    Media and links run the full agentic pipeline and are remembered per
+    sender, so follow-up questions chat about the last case. RETRY replays
+    the last cached verdict. Anything else gets help text.
+
     Returns:
         The reply text that was (or would be) sent.
     """
     from app.core.config import settings
+    from app.features.analysis import service as analysis_service
     from app.features.analysis.agents import pipeline as agentic
     from app.features.whatsapp_bot import client as wa_client
     from app.features.whatsapp_bot import media as wa_media
-    from app.features.whatsapp_bot.messages import format_failure, format_verdict
+    from app.features.whatsapp_bot.messages import DISCLAIMER, format_failure, format_verdict
 
     sender = str(payload.get("From", ""))
     body = str(payload.get("Body", "") or "").strip()
@@ -78,39 +89,62 @@ async def handle_inbound(payload: dict) -> str:
                 pass
         return text
 
+    def _report_url(case_id: str) -> str:
+        return f"{settings.frontend_url}/report/{case_id}"
+
+    async def _answer_case(result: dict) -> str:
+        case_id = str(result.get("case_id", ""))
+        if sender and case_id:
+            _LAST_CASE[sender] = case_id
+        url = _report_url(case_id)
+        return await reply(
+            format_verdict(result["verdict"], _first_sentence(result.get("explanation", "")), url),
+            url,
+        )
+
     if content_type.startswith("image/"):
         try:
             data = await wa_media.download(media_url)
-            result = await agentic.analyze_image(data, mime="image/jpeg", source="whatsapp")
+            result = await agentic.analyze_image(data, mime=content_type, source="whatsapp")
         except Exception:
             return await reply(format_failure())
-        sha = result.get("evidence", {}).get("sha256", "")[:12]
-        url = f"{settings.frontend_url}/report/{sha}"
-        return await reply(format_verdict(result["verdict"], _first_sentence(result.get("explanation", "")), url), url)
+        return await _answer_case(result)
     if content_type.startswith("video/"):
         try:
             data = await wa_media.download(media_url)
-            result = await agentic.analyze_video(data, mime="video/mp4", source="whatsapp")
+            result = await agentic.analyze_video(data, mime=content_type, source="whatsapp")
         except Exception:
             return await reply(format_failure())
-        sha = result.get("evidence", {}).get("sha256", "")[:12]
-        url = f"{settings.frontend_url}/report/{sha}"
-        return await reply(format_verdict(result["verdict"], _first_sentence(result.get("explanation", "")), url), url)
+        return await _answer_case(result)
     if content_type.startswith("audio/"):
         try:
             data = await wa_media.download(media_url)
-            result = await agentic.analyze_audio(data, mime="audio/mpeg", source="whatsapp")
+            result = await agentic.analyze_audio(data, mime=content_type, source="whatsapp")
         except Exception:
             return await reply(format_failure())
-        sha = result.get("evidence", {}).get("sha256", "")[:12]
-        url = f"{settings.frontend_url}/report/{sha}"
-        return await reply(format_verdict(result["verdict"], _first_sentence(result.get("explanation", "")), url), url)
+        return await _answer_case(result)
     if body.startswith(("http://", "https://")):
         try:
             result = await agentic.analyze_link(body, source="whatsapp")
         except Exception:
             return await reply(format_failure())
-        sha = result.get("evidence", {}).get("sha256", "")[:12]
-        url = f"{settings.frontend_url}/report/{sha}"
-        return await reply(format_verdict(result["verdict"], _first_sentence(result.get("explanation", "")), url), url)
+        return await _answer_case(result)
+    if body.strip().upper() == "RETRY" and sender in _LAST_CASE:
+        case = analysis_service.get_case(_LAST_CASE[sender])
+        if case is not None:
+            url = _report_url(_LAST_CASE[sender])
+            return await reply(
+                format_verdict(
+                    str(case.get("verdict", "insufficient_evidence")),
+                    _first_sentence(str(case.get("explanation", ""))),
+                    url,
+                ),
+                url,
+            )
+    if body and sender in _LAST_CASE:
+        try:
+            answer = await analysis_service.answer_question(_LAST_CASE[sender], body)
+        except Exception:
+            return await reply(format_failure())
+        return await reply(f"{answer}\n\n{DISCLAIMER}")
     return await reply(HELP_TEXT)

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Link2, ScanLine, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { submitLink, uploadFile } from "@/features/analysis/api";
+import { errorMessage } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 const ACCEPT = [
@@ -74,8 +75,8 @@ export default function AnalyzePage() {
     setFileName(file.name);
     try {
       goReport(await uploadFile(file));
-    } catch {
-      setNotice("Upload failed — check the file type and try again.");
+    } catch (err) {
+      setNotice(errorMessage(err, "Upload failed — check the file type and try again."));
     } finally {
       setBusy(false);
     }
@@ -89,9 +90,9 @@ export default function AnalyzePage() {
     setFileName(url.trim());
     try {
       goReport(await submitLink(url));
-    } catch {
+    } catch (err) {
       setNotice(
-        "Couldn't fetch this link automatically — try downloading the media and uploading it directly.",
+        errorMessage(err, "Couldn't fetch this link automatically — try downloading the media and uploading it directly."),
       );
     } finally {
       setBusy(false);
