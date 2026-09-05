@@ -34,3 +34,42 @@ export const VERDICTS: Record<
     wash: "bg-ink-soft/10",
   },
 };
+
+/** Fused manipulation-probability bands: single source of truth for meters. */
+export const SCORE_BANDS = [
+  { max: 0.3, key: "low", word: "Low", blurb: "reads like an ordinary capture" },
+  { max: 0.55, key: "unclear", word: "Unclear", blurb: "mixed signals, no winner" },
+  { max: 0.7, key: "elevated", word: "Elevated", blurb: "several signs agree" },
+  { max: 1.01, key: "high", word: "High", blurb: "strong manipulation signs" },
+] as const;
+
+export function bandForScore(score: number): (typeof SCORE_BANDS)[number] {
+  return SCORE_BANDS.find((b) => score < b.max) ?? SCORE_BANDS[0];
+}
+
+/** One-line mechanism gloss per local instrument (plain verbs, jargon last). */
+export const TOOL_LABELS: Record<string, { name: string; gloss: string; mechanism: string }> = {
+  ela: {
+    name: "ELA",
+    gloss: "recompression glow check",
+    mechanism:
+      "Re-saves the image and amplifies the difference: regions compressed differently from the rest glow brighter.",
+  },
+  dct: {
+    name: "DCT grid",
+    gloss: "block-pattern check",
+    mechanism:
+      "Measures JPEG block-energy variance: spliced regions break the camera's uniform block rhythm.",
+  },
+  noise: {
+    name: "Noise grain",
+    gloss: "grain-mismatch check",
+    mechanism:
+      "Compares sensor grain across regions: pasted content carries a different grain signature.",
+  },
+  copymove: {
+    name: "Copy-move",
+    gloss: "clone-region check",
+    mechanism: "Hunts duplicated pixel blocks: cloned areas stamped twice inside one frame.",
+  },
+};
