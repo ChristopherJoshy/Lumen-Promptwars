@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display, JetBrains_Mono } from "next/font/google";
+import { Inter, Noto_Sans, Playfair_Display, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 
 const sans = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const noto = Noto_Sans({ subsets: ["latin", "devanagari"], variable: "--font-noto" });
 const display = Playfair_Display({ subsets: ["latin"], style: ["italic", "normal"], variable: "--font-display" });
+const lab = Space_Grotesk({ subsets: ["latin"], variable: "--font-lab" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
@@ -19,7 +21,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${display.variable} ${mono.variable}`}>
+    <html lang="en" className={`${sans.variable} ${noto.variable} ${display.variable} ${lab.variable} ${mono.variable}`}>
       <body className="min-h-screen bg-paper text-ink antialiased">
         <a
           href="#main"
