@@ -26,11 +26,15 @@ export aligned with India's Feb 2026 IT rules. Optimize every decision for
 - Realtime: native FastAPI WebSockets, per-job progress channel.
 - Link ingestion: `yt-dlp` as a Python library. NEVER use Meta oEmbed for
   extraction (terms restrict it to front-end embedding display).
+- Detection (v1): image/video/audio verdicts come from the Muse agentic
+  pipeline (`backend/app/features/analysis/agents/`); local-weight
+  checkpoints are superseded, no `.pt/.onnx` weights ship with the repo.
 - WhatsApp: Twilio API (sandbox for dev). Webhook validates
   `X-Twilio-Signature`, enqueues a Taskiq job, returns TwiML fast — no inline
   processing. 16 MB media limit → reply "use web upload instead".
-- Context: Google Fact Check Tools API first (India signatories labeled
-  distinctly); generic reverse search is secondary.
+- Context: Exa (keyed) + DDGS/DuckDuckGo (keyless, in-en) web evidence,
+  India signatories (PIB, Alt News, BOOM, Factly) labeled distinctly;
+  Google Fact Check Tools API is a future enrichment, not the v1 path.
 
 ## How to work (Pi workflow)
 
@@ -47,6 +51,9 @@ export aligned with India's Feb 2026 IT rules. Optimize every decision for
 - Commit per logical checkpoint, Conventional Commits (see
   `skills/commit-conventions/SKILL.md`). Small reviewable diffs; stub with
   `NotImplementedError` + docstring rather than one giant commit.
+- Commit discipline: commit AND push after every small logical change — one
+  Conventional Commit per sub-step, never accumulate unpushed work across
+  steps, never batch multiple steps into one commit.
 - Maintain `changes.md` with every change. Never modify without asking:
   applied Alembic migrations, `.env`/secrets.
 - Python MUST run inside `backend/.venv` — never install or run with the
