@@ -27,8 +27,20 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.features.analysis.agents import audio as audio_agent
-from app.features.analysis.agents import forensics, judge, links, meta, muse_client, searcher, temporal
+from app.features.analysis.agents import forensics, judge, links, meta, muse_client, sarvam, searcher, temporal
 from app.features.analysis.agents import visual as visual_agent
+
+_SARVAM_EXT = {
+    "audio/mpeg": "audio.mp3",
+    "audio/wav": "audio.wav",
+    "audio/x-m4a": "audio.m4a",
+    "audio/ogg": "audio.ogg",
+    "audio/mp4": "audio.mp4",
+}
+
+
+def _sarvam_filename(mime: str) -> str:
+    return _SARVAM_EXT.get(mime.lower(), "audio.mp3")
 
 PIPELINE_VERSION = "agentic-v1"
 
@@ -363,9 +375,18 @@ async def analyze_audio(
     cache_key = hashlib.sha256(f"{settings.muse_model}@{PIPELINE_VERSION}:aud:".encode() + data).hexdigest()
     if hit := _cache_get(cache_key):
         return hit
+    sarvam_result: dict | None = None
+    sarvam_warning: str | None = None
+    if settings.sarvam_api_key:
+        try:
+            sarvam_result = await sarvam.transcribe(data, filename=_sarvam_filename(mime))
+        except sarvam.SarvamError as exc:
+            sarvam_warning = f"sarvam degraded to Muse-only: {exc}"
+    else:
+        sarvam_warning = "sarvam skipped: no key"
     try:
         perceptual, meta_info = await asyncio.gather(
-            audio_agent.analyze(data, mime),
+            audio_agent.analyze(data, mime, sarvam_hint=sarvam_result),
             asyncio.to_thread(meta.read, data, mime),
         )
     except muse_client.MuseError as exc:
@@ -387,6 +408,7 @@ async def analyze_audio(
         claimed_date=claimed_date,
         source=source,
     )
+    result["signals"]["sarvam"] = {"result": sarvam_result, "warning": sarvam_warning}
     _cache_put(cache_key, result)
     return result
 

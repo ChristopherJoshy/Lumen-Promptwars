@@ -33,12 +33,14 @@ _MIME_TO_DATA = {
 }
 
 
-async def analyze(audio_bytes: bytes, mime: str) -> dict:
+async def analyze(audio_bytes: bytes, mime: str, sarvam_hint: dict | None = None) -> dict:
     """Analyze audio for synthesis/editing cues plus transcript hint.
 
     Args:
         audio_bytes: Raw audio bytes (caller enforces size/duration caps).
         mime: Original MIME type.
+        sarvam_hint: optional sarvam.transcribe() output; the transcript is
+            ground truth and detected_language overrides language_guess.
 
     Returns:
         Dict with observations, artifact_score, transcript_hint,
@@ -51,10 +53,18 @@ async def analyze(audio_bytes: bytes, mime: str) -> dict:
         raise ValueError("audio.analyze received empty bytes.")
     data_mime = _MIME_TO_DATA.get(mime.lower(), "audio/mp3")
     b64 = base64.b64encode(audio_bytes).decode()
+    user_text = "Analyze this audio. Return JSON only, no commentary."
+    if sarvam_hint:
+        user_text += (
+            f" Ground-truth transcript ({sarvam_hint.get('detected_language', 'unknown')}): "
+            f"{sarvam_hint.get('transcript', '')}"
+            + (f" / English: {sarvam_hint.get('translated_en')}" if sarvam_hint.get("translated_en") else "")
+            + " Do not re-transcribe; judge synthesis/editing cues only."
+        )
     parts = [
         {
             "type": "input_text",
-            "text": "Analyze this audio. Return JSON only, no commentary.",
+            "text": user_text,
         },
         {"type": "input_audio", "audio_url": f"data:{data_mime};base64,{b64}"},
     ]
@@ -68,10 +78,15 @@ async def analyze(audio_bytes: bytes, mime: str) -> dict:
         raise muse_client.MuseError("Audio agent artifact_score is not a number.") from exc
     if not 0.0 <= result["artifact_score"] <= 1.0:
         raise muse_client.MuseError("Audio agent artifact_score outside 0..1.")
+    language_guess = str(result["language_guess"])
+    transcript_hint = str(result["transcript_hint"])
+    if sarvam_hint and sarvam_hint.get("detected_language"):
+        language_guess = str(sarvam_hint["detected_language"])  # instrument wins
+        transcript_hint = str(sarvam_hint.get("transcript") or transcript_hint)
     return {
         "observations": list(result["observations"]),
         "artifact_score": result["artifact_score"],
-        "transcript_hint": str(result["transcript_hint"]),
-        "language_guess": str(result["language_guess"]),
+        "transcript_hint": transcript_hint,
+        "language_guess": language_guess,
         "entities": list(result["entities"]),
     }
