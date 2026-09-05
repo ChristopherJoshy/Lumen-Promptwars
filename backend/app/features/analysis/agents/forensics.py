@@ -189,12 +189,13 @@ def blockiness(image_rgb: bytes) -> dict:
 
 
 def spectrum(image_rgb: bytes) -> dict:
-    """Fourier peak-over-mean anomaly: upsamplers leave sharp spectral peaks.
+    """Fourier anomaly: sharp high-freq peaks + depleted mid-band energy.
 
     Natural photos and grain decay without dominant high-frequency spikes;
-    GAN/diffusion upsampling leaves sharp peaks in the outer spectrum.
-    Calibrated 2026-09-05 (128px grayscale): white noise 3.2, real photo
-    4.0, pollinations AI still 12.6 → score = (peak - 5) / 10, clamped.
+    GAN/diffusion upsampling leaves sharp peaks in the outer spectrum, and
+    diffusion models under-render mid-band content (FIRE, CVPR 2025).
+    Calibrated 2026-09-05: peak-over-mean white noise 3.2, real photo 4.0,
+    pollinations AI still 12.6; mid-band share photo 0.208, AI 0.119.
     Weak signal by design: one vote among seven, never a lone decider.
     """
     gray = np.asarray(Image.open(io.BytesIO(image_rgb)).convert("L"), dtype=np.float32)
@@ -203,11 +204,16 @@ def spectrum(image_rgb: bytes) -> dict:
     h, w = gray.shape
     spectrum_2d = np.abs(np.fft.fftshift(np.fft.fft2(gray - gray.mean())))
     yy, xx = np.mgrid[:h, :w]
-    radius = np.sqrt((yy - h / 2) ** 2 + (xx - w / 2) ** 2)
-    outer = spectrum_2d[radius >= radius.max() * 8 / 12]
+    radius = np.sqrt((yy - h / 2) ** 2 + (xx - w / 2) ** 2) / np.sqrt((h / 2) ** 2 + (w / 2) ** 2)
+    outer = spectrum_2d[radius >= 8 / 12]
     peak = float(outer.max() / (outer.mean() + 1e-9))
-    score = float(min(1.0, max(0.0, (peak - 5.0) / 10.0)))
-    ring = (radius >= radius.max() * 8 / 12).astype(np.float32) * 255.0
+    peak_term = min(1.0, max(0.0, (peak - 5.0) / 10.0))
+    bands = [(0.0, 0.33), (0.33, 0.66), (0.66, 1.0)]
+    energy = [float(spectrum_2d[(radius >= a) & (radius < b)].mean() + 1e-9) for a, b in bands]
+    mid_share = energy[1] / sum(energy)
+    mid_term = min(1.0, max(0.0, (0.17 - mid_share) / 0.08))
+    score = float(max(peak_term, mid_term))
+    ring = (radius >= 8 / 12).astype(np.float32) * 255.0
     return {"score": score, "heatmap_png": _to_heatmap_png(ring * (0.3 + 0.7 * score))}
 
 
