@@ -345,3 +345,49 @@ def test_whatsapp_conversation_remembers_and_answers(monkeypatch):
     finally:
         cache_file.unlink(missing_ok=True)
     assert "Verified" in replay
+
+
+def test_whatsapp_image_flow_ack_then_summary_link(monkeypatch):
+    from app.features.whatsapp_bot import tasks as wa_tasks
+
+    sent: list[str] = []
+
+    async def fake_download(url):
+        return b"bytes"
+
+    async def fake_image(data, *, mime, source, claimed_date=None):
+        return {
+            "verdict": "likely_synthetic",
+            "confidence": 0.8,
+            "explanation": "AI texture here. Second sentence.",
+            "reasons": ["r"],
+            "signals": {},
+            "model_version": "m@agentic-v1",
+            "evidence": {"sha256": "aabbccddeeff0011", "caption": "c"},
+            "cached": False,
+            "case_id": "d" * 64,
+        }
+
+    async def fake_send(to, text, report_url):
+        sent.append(text)
+
+    monkeypatch.setattr("app.features.whatsapp_bot.media.download", fake_download)
+    monkeypatch.setattr("app.features.analysis.agents.pipeline.analyze_image", fake_image)
+    monkeypatch.setattr("app.features.whatsapp_bot.client.send_verdict", fake_send)
+    wa_tasks._LAST_CASE.clear()
+    out = _run(
+        wa_tasks.handle_inbound(
+            {
+                "From": "whatsapp:+911234567890",
+                "NumMedia": "1",
+                "MediaUrl0": "https://x/f",
+                "MediaContentType0": "image/jpeg",
+                "Body": "",
+            }
+        )
+    )
+    assert len(sent) == 2
+    assert "40 seconds" in sent[0]
+    assert "Likely synthetic" in sent[1]
+    assert f"/report/{'d' * 64}" in sent[1]
+    assert out == sent[1]
