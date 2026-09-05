@@ -8,6 +8,7 @@ import { ScoreLedger } from "@/features/report/score-ledger";
 import { WhyLedger } from "@/features/report/why-ledger";
 import { SourceChips } from "@/features/report/source-chips";
 import { VoiceBlock } from "@/features/report/voice-block";
+import { AskAgent } from "@/features/report/ask-agent";
 import { ForensicGallery } from "@/features/report/forensic-gallery";
 
 // Server component: SSR so shared links render proper preview cards.
@@ -48,6 +49,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         )}
 
         {isAudio && <VoiceBlock sarvam={report.signals?.sarvam} audioTools={report.signals?.perceptual?.audio_tools} />}
+
+        <AskAgent caseId={report.case_id} />
 
         <SourceChips search={report.signals?.search} />
 
