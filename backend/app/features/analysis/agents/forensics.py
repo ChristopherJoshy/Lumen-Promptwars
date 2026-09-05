@@ -144,11 +144,55 @@ def copy_move(image_rgb: bytes) -> dict:
     return {"score": score, "heatmap_png": _to_heatmap_png(big)}
 
 
-def examine(data: bytes) -> dict:
-    """Run all four instruments; sha-keyed artifacts reused, never recomputed.
+def jpeg_ghost(image_rgb: bytes) -> dict:
+    """Double-compression ghost: ELA response curve across qualities.
 
-    Returns {scores: {ela, dct, noise, copymove, fused_mean},
-    artifacts: {name: path}, note: str}.
+    Spliced regions minimized at a different quality than the background;
+    the spread of per-quality mean responses is the score.
+    """
+    orig = _to_rgb(image_rgb).astype(np.float32)
+    means = []
+    diffs = []
+    for quality in (60, 75, 90):
+        buf = io.BytesIO()
+        Image.fromarray(_to_rgb(image_rgb)).save(buf, "JPEG", quality=quality)
+        recomp = _to_rgb(buf.getvalue()).astype(np.float32)
+        diff = np.abs(orig - recomp).mean(axis=2)
+        means.append(float(diff.mean()))
+        diffs.append(diff)
+    spread = max(means) - min(means)
+    score = float(min(1.0, spread / 12.0))
+    heat = diffs[2] / (diffs[2].max() + 1e-6) * 255.0
+    return {"score": score, "heatmap_png": _to_heatmap_png(heat)}
+
+
+def blockiness(image_rgb: bytes) -> dict:
+    """8x8 grid-boundary discontinuity: misaligned splices break the grid."""
+    gray = np.asarray(Image.open(io.BytesIO(image_rgb)).convert("L"), dtype=np.float32)
+    if gray.size == 0:
+        raise ValueError("Unreadable image bytes.")
+    h, w = gray.shape
+    h8, w8 = (h // 8) * 8, (w // 8) * 8
+    gray = gray[:h8, :w8]
+    vert = np.abs(np.diff(gray, axis=1))
+    horiz = np.abs(np.diff(gray, axis=0))
+    on_grid_v = vert[:, 7::8].mean()
+    off_grid_v = np.delete(vert, slice(7, vert.shape[1], 8), axis=1).mean()
+    on_grid_h = horiz[7::8, :].mean()
+    off_grid_h = np.delete(horiz, slice(7, horiz.shape[0], 8), axis=0).mean()
+    ratio = (on_grid_v + on_grid_h + 1e-6) / (off_grid_v + off_grid_h + 1e-6)
+    score = float(min(1.0, max(0.0, (ratio - 1.0) / 2.0)))
+    heat = np.zeros_like(gray)
+    heat[:, 7::8] = 255.0
+    heat[7::8, :] = 255.0
+    return {"score": score, "heatmap_png": _to_heatmap_png(heat * min(1.0, ratio / 3.0))}
+
+
+def examine(data: bytes) -> dict:
+    """Run all six instruments; sha-keyed artifacts reused, never recomputed.
+
+    Returns {scores: {ela, dct, noise, copymove, ghost, blockiness,
+    fused_mean}, artifacts: {name: path}, note: str}.
     """
     from app.features.analysis.agents import pipeline  # lazy: pipeline imports us
 
@@ -160,7 +204,14 @@ def examine(data: bytes) -> dict:
 
         try:
             cached = json.loads(score_path.read_text())
-            if set(cached.get("scores", {})) >= {"ela", "dct", "noise", "copymove"}:
+            if set(cached.get("scores", {})) >= {
+                "ela",
+                "dct",
+                "noise",
+                "copymove",
+                "ghost",
+                "blockiness",
+            }:
                 return cached
         except (OSError, ValueError):
             pass
@@ -169,6 +220,8 @@ def examine(data: bytes) -> dict:
         "dct": dct_grid(jpeg),
         "noise": noise_map(jpeg),
         "copymove": copy_move(jpeg),
+        "ghost": jpeg_ghost(jpeg),
+        "blockiness": blockiness(jpeg),
     }
     artifacts: dict[str, str] = {}
     for name, res in results.items():
@@ -177,11 +230,10 @@ def examine(data: bytes) -> dict:
             path.write_bytes(res["heatmap_png"])
         artifacts[name] = str(path)
     scores = {name: round(float(res["score"]), 3) for name, res in results.items()}
-    mean = round(sum(scores.values()) / len(scores), 3)
     payload = {
         "scores": {**scores, "fused_mean": mean},
         "artifacts": artifacts,
-        "note": "Local numeric instruments (ELA/DCT/noise/copy-move); "
+        "note": "Local numeric instruments (ELA/DCT/noise/copy-move/ghost/blockiness); "
         "highlights mark regions to inspect, not proof of fakery.",
     }
     try:

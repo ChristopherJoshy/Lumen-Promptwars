@@ -44,6 +44,10 @@ export aligned with India's Feb 2026 IT rules. Optimize every decision for
 - Implement: fix source, never suppress symptoms or fabricate fallback data.
   A detector that can't load fails loudly — never a fake "insufficient
   evidence". Migrate every caller; delete obsolete code, no shims.
+- No mocks allowed in shipped code or live paths: every signal, score,
+  transcript, and verdict must come from a real tool or model call.
+  Mocks exist ONLY inside `backend/tests/` to isolate units. A path that
+  cannot run its real tool raises loudly instead of returning placeholder data.
 - Verify before yielding: run the thing (backend tests, `next lint` /
   `tsc --noEmit`, or a throwaway smoke script). No routine `git` calls for
   validation. New tests only for genuinely uncertain edges; never assert

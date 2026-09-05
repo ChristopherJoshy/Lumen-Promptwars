@@ -39,6 +39,22 @@ def _extract(url: str) -> dict:
     return {"info": info or {}, "tmpdir": tmpdir}
 
 
+def _ssrf_blocked(url: str) -> str | None:
+    """Return a reason when the URL targets non-public hosts, else None."""
+    import ipaddress
+    import socket
+    from urllib.parse import urlsplit
+
+    try:
+        host = urlsplit(url).hostname or ""
+        ip = ipaddress.ip_address(socket.gethostbyname(host))
+    except Exception:
+        return "host does not resolve to a public address"
+    if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
+        return "host is not a public address"
+    return None
+
+
 async def resolve(url: str) -> dict:
     """Resolve a public link to downloadable bytes plus metadata.
 
@@ -53,6 +69,21 @@ async def resolve(url: str) -> dict:
         the direct-upload remedy — never an exception, never silence.
     """
     platform = detect_platform(url)
+    blocked = _ssrf_blocked(url)
+    if blocked:
+        return {
+            "kind": "unresolved",
+            "data": None,
+            "mime": None,
+            "metadata": {
+                "uploader": "",
+                "upload_date": None,
+                "title": "",
+                "description": "",
+                "platform": platform,
+            },
+            "note": f"Refused {blocked}; only public media links are fetched.",
+        }
     try:
         result = await asyncio.to_thread(_extract, url)
     except Exception as exc:

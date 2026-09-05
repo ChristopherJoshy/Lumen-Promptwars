@@ -21,7 +21,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.core.config import settings
 from app.features.analysis.agents import audio as audio_agent
-from app.features.analysis.agents import forensics, meta, muse_client, sarvam
+from app.features.analysis.agents import forensics, meta, muse_client, sarvam, synthid
 from app.features.analysis.agents import pipeline
 from app.features.analysis.agents import visual as visual_agent
 
@@ -38,6 +38,7 @@ class CaseState(TypedDict, total=False):
     perceptual: dict
     meta: dict
     tool: dict | None
+    provenance: dict | None
     sarvam: dict | None
     search: dict
     shaped: dict
@@ -59,12 +60,22 @@ async def run_case(
     claimed_date: str | None,
     thread_id: str,
     pre_sarvam: dict | None = None,
+    progress: dict | None = None,
 ) -> dict:
-    """Run one case through the graph; returns the shaped verdict dict."""
+    """Run one case through the graph; returns the shaped verdict dict.
+
+    progress, when given, is a caller-owned mutable mapping updated with
+    {"stage": ...} as each node completes — polled by the jobs endpoint.
+    """
     ctx = {"data": data, "mime": mime, "frames": [], "frame_tools": []}
+
+    def _mark(stage: str) -> None:
+        if progress is not None:
+            progress["stage"] = stage
 
     async def fetch_tools(state: CaseState) -> dict:
         warnings: list[str] = []
+        _mark("fetch_tools")
         if modality == "video":
             try:
                 meta_info = await asyncio.to_thread(meta.read, ctx["data"], ctx["mime"])
@@ -123,15 +134,17 @@ async def run_case(
                 )
             return {"meta": meta_info, "sarvam": sarvam_result, "errors": warnings}
         try:
-            tool, meta_info = await asyncio.gather(
+            tool, meta_info, provenance = await asyncio.gather(
                 asyncio.to_thread(forensics.examine, ctx["data"]),
                 asyncio.to_thread(meta.read, ctx["data"], ctx["mime"]),
+                asyncio.to_thread(synthid.scan, ctx["data"]),
             )
         except ValueError as exc:
             raise pipeline.AnalysisError(str(exc)) from exc
-        return {"meta": meta_info, "tool": tool, "errors": warnings}
+        return {"meta": meta_info, "tool": tool, "provenance": provenance, "errors": warnings}
 
     async def perceive(state: CaseState) -> dict:
+        _mark("perceive")
         try:
             if modality == "video":
                 per_frame = list(
@@ -183,6 +196,7 @@ async def run_case(
         }
 
     async def retrieve(state: CaseState) -> dict:
+        _mark("retrieve")
         search_result = await pipeline.run_search(
             caption=state.get("caption", ""),
             entities=state.get("entities", []),
@@ -191,6 +205,7 @@ async def run_case(
         return {"search": search_result}
 
     async def adjudicate(state: CaseState) -> dict:
+        _mark("adjudicate")
         tool = state.get("tool")
         sarvam_result = state.get("sarvam")
         sarvam_entry = None
