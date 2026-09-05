@@ -143,7 +143,7 @@ def test_audio_coerces_sarvam_language(monkeypatch):
 
     monkeypatch.setattr(audio_agent.muse_client, "respond", fake_respond)
     hint = {"transcript": "vanakkam", "detected_language": "ta-IN", "translated_en": ""}
-    out = _run(audio_agent.analyze(b"audio", "audio/mpeg", sarvam_hint=hint))
+    out = _run(audio_agent.analyze(b"audio", "audio/wav", sarvam_hint=hint))
     assert out["language_guess"] == "ta-IN"
     assert out["transcript_hint"] == "vanakkam"
 

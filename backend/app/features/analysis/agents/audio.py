@@ -37,6 +37,35 @@ _MIME_TO_DATA = {
 }
 
 
+def _to_wav(audio_bytes: bytes) -> bytes:
+    """Transcode to 16 kHz mono WAV: Zen audio input rejects Opus-in-ogg
+    (live 400, 2026-09-05) the way it once rejected tiny JPEGs — normalize,
+    never downgrade to a text-only verdict."""
+    import subprocess
+    import tempfile
+    from pathlib import Path
+
+    try:
+        from imageio_ffmpeg import get_ffmpeg_exe
+    except ImportError as exc:
+        raise ValueError(
+            "imageio-ffmpeg is not installed; see https://ffmpeg.org/download.html."
+        ) from exc
+    with tempfile.TemporaryDirectory(prefix="lumen-audio-") as tmpdir:
+        src = Path(tmpdir) / "src"
+        src.write_bytes(audio_bytes)
+        out = Path(tmpdir) / "norm.wav"
+        proc = subprocess.run(
+            [get_ffmpeg_exe(), "-y", "-i", str(src), "-ac", "1", "-ar", "16000", str(out)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=60,
+        )
+        if proc.returncode != 0:
+            raise ValueError(f"Audio transcode failed: {proc.stderr.decode(errors='replace')[:200]}")
+        return out.read_bytes()
+
+
 async def analyze(audio_bytes: bytes, mime: str, sarvam_hint: dict | None = None) -> dict:
     """Analyze audio for synthesis/editing cues plus transcript hint.
 
@@ -55,8 +84,11 @@ async def analyze(audio_bytes: bytes, mime: str, sarvam_hint: dict | None = None
     """
     if not audio_bytes:
         raise ValueError("audio.analyze received empty bytes.")
-    data_mime = _MIME_TO_DATA.get(mime.lower(), "audio/mp3")
-    b64 = base64.b64encode(audio_bytes).decode()
+    if mime.lower() in ("audio/wav", "audio/x-wav"):
+        listen_bytes, data_mime = audio_bytes, "audio/wav"
+    else:
+        listen_bytes, data_mime = _to_wav(audio_bytes), "audio/wav"
+    b64 = base64.b64encode(listen_bytes).decode()
     user_text = "Analyze this audio. Return JSON only, no commentary."
     if sarvam_hint:
         user_text += (
