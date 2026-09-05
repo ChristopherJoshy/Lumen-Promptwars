@@ -77,6 +77,12 @@ _SARVAM_EXT = {
     "audio/ogg": "audio.ogg",
     "audio/mp4": "audio.mp4",
 }
+
+
+def _sarvam_filename(mime: str) -> str:
+    return _SARVAM_EXT.get(mime.lower(), "audio.mp3")
+
+
 PIPELINE_VERSION = "agentic-v1"
 
 _WEB_IMAGE_MAX = 25 * 1024 * 1024

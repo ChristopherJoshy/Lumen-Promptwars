@@ -10,7 +10,6 @@ strong positive evidence of AI generation.
 
 from __future__ import annotations
 
-import io
 import struct
 
 # Lowercase substrings that identify known generators in tag/chunk text.
