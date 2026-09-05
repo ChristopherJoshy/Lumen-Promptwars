@@ -21,6 +21,9 @@ Format: `## <date> — <scope>` + bullets. Newest first. One line per change.
 - Deploy: `frontend/vercel.json` (Root Directory `frontend/`), `render.yaml`
   backend blueprint; live verified: photo verified 0.86, Hindi clip 0.85
 - Suite at 36 passed; `tsc` + `next build` green (6 routes)
+- Prod live: Vercel serves the scan-lab (root workspace build), Render CORS
+  allows the Vercel origin, `/usage` reads Atlas; ingestion submit routes
+  remain skeleton (report APIs serve cache only)
 ## 2026-09-05 — agentic verdict pipeline
 
 - Muse Spark 1.3 multiagent pipeline live (`agents/`: muse_client, visual,
