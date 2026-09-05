@@ -96,13 +96,14 @@ async def run_case(
                 )
             )
             ctx["frame_tools"] = frame_tools
+            provenance = await asyncio.to_thread(synthid.scan, frames[0]) if frames else None
             agg = {
                 name: round(
                     sum(float((t.get("scores") or {}).get(name, 0.0)) for t in frame_tools)
                     / len(frame_tools),
                     3,
                 )
-                for name in ("ela", "dct", "noise", "copymove", "fused_mean")
+                for name in ("ela", "dct", "noise", "copymove", "ghost", "blockiness", "spectrum", "fused_mean")
             }
             fused = [float((t.get("scores") or {}).get("fused_mean", 0.0)) for t in frame_tools]
             worst = frame_tools[max(range(len(frame_tools)), key=lambda i: fused[i])]
@@ -111,7 +112,7 @@ async def run_case(
                 "artifacts": worst.get("artifacts", {}),
                 "note": f"Mean over {len(frames)} frames; heatmaps from the worst frame.",
             }
-            return {"meta": meta_info, "tool": tool, "errors": warnings}
+            return {"meta": meta_info, "tool": tool, "provenance": provenance, "errors": warnings}
         if modality == "audio":
             sarvam_result = pre_sarvam
             if sarvam_result is None and settings.sarvam_api_key:

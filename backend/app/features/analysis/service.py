@@ -48,7 +48,7 @@ async def answer_question(case_id: str, question: str) -> str:
 
 
 _CASE_RE = re.compile(r"^[0-9a-f]{64}$")
-_FORENSIC_NAMES = ("ela", "dct", "noise", "copymove", "ghost", "blockiness")
+_FORENSIC_NAMES = ("ela", "dct", "noise", "copymove", "ghost", "blockiness", "spectrum")
 
 def _cache_path(case_id: str) -> Path | None:
     if not _CASE_RE.match(case_id):

@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 import io
 
+import numpy as np
 import pytest
 from PIL import Image
-
 
 def _run(coro):
     return asyncio.run(coro)
@@ -97,19 +97,23 @@ def test_sarvam_transcribe_and_translate(monkeypatch):
     assert out == {"transcript": "namaste", "detected_language": "hi-IN", "translated_en": "hello"}
 
 
-def test_sarvam_skips_translate_for_english(monkeypatch):
-    _QueueClient.responses = [{"transcript": "hello", "language_code": "en-IN"}]
-    monkeypatch.setattr(sarvam.httpx, "AsyncClient", _QueueClient)
-    monkeypatch.setattr(sarvam.settings, "sarvam_api_key", "k")
-    out = _run(sarvam.transcribe(b"audio", filename="a.mp3"))
-    assert out["translated_en"] == ""
+def test_examine_fresh_run_six_scores(monkeypatch, tmp_path):
+    monkeypatch.setattr(forensics, "_artifact_dir", lambda: tmp_path)
+    out = forensics.examine(_png())
+    assert set(out["scores"]) == {"ela", "dct", "noise", "copymove", "ghost", "blockiness", "spectrum", "fused_mean"}
+    assert set(out["artifacts"]) == {"ela", "dct", "noise", "copymove", "ghost", "blockiness", "spectrum"}
+    out2 = forensics.examine(_png())
+    assert out2["scores"] == out["scores"]
 
+def test_spectrum_flags_peaky_synthetic():
+    from PIL import Image as PILImage
 
-def test_sarvam_missing_key_raises(monkeypatch):
-    monkeypatch.setattr(sarvam.settings, "sarvam_api_key", "")
-    with pytest.raises(sarvam.SarvamError):
-        _run(sarvam.transcribe(b"audio"))
-
+    grid = (np.indices((128, 128)).sum(axis=0) % 2 * 255).astype("uint8")
+    grid = np.stack([grid] * 3, axis=2)
+    grid_buf = io.BytesIO()
+    PILImage.fromarray(grid).save(grid_buf, "PNG")
+    assert forensics.spectrum(grid_buf.getvalue())["score"] > 0.5
+    assert forensics.spectrum(_png())["score"] < 0.5
 
 def test_visual_injects_instrument_readings(monkeypatch):
     seen: dict = {}

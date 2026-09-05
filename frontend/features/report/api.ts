@@ -29,6 +29,9 @@ export interface ForensicsScores {
   dct?: number;
   noise?: number;
   copymove?: number;
+  ghost?: number;
+  blockiness?: number;
+  spectrum?: number;
   fused_mean?: number;
 }
 
@@ -86,7 +89,14 @@ export interface FullReport {
 export async function getFullReport(id: string): Promise<FullReport | null> {
   try {
     return await api<FullReport>(`/api/v1/analysis/report/${id}`);
-  } catch {
+  } catch (err) {
+    // Unknown case -> notFound page. Unreachable backend -> throw so the
+    // error boundary offers a retry instead of a fake 404.
+    if (err instanceof TypeError) throw err;
+    if (typeof err === "object" && err !== null && "status" in err) {
+      const status = (err as { status?: unknown }).status;
+      if (status !== 404) throw err;
+    }
     return null;
   }
 }

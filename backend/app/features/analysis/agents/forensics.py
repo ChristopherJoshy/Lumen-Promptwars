@@ -188,10 +188,33 @@ def blockiness(image_rgb: bytes) -> dict:
     return {"score": score, "heatmap_png": _to_heatmap_png(heat * min(1.0, ratio / 3.0))}
 
 
-def examine(data: bytes) -> dict:
-    """Run all six instruments; sha-keyed artifacts reused, never recomputed.
+def spectrum(image_rgb: bytes) -> dict:
+    """Fourier peak-over-mean anomaly: upsamplers leave sharp spectral peaks.
 
-    Returns {scores: {ela, dct, noise, copymove, ghost, blockiness,
+    Natural photos and grain decay without dominant high-frequency spikes;
+    GAN/diffusion upsampling leaves sharp peaks in the outer spectrum.
+    Calibrated 2026-09-05 (128px grayscale): white noise 3.2, real photo
+    4.0, pollinations AI still 12.6 → score = (peak - 5) / 10, clamped.
+    Weak signal by design: one vote among seven, never a lone decider.
+    """
+    gray = np.asarray(Image.open(io.BytesIO(image_rgb)).convert("L"), dtype=np.float32)
+    if gray.size == 0:
+        raise ValueError("Unreadable image bytes.")
+    h, w = gray.shape
+    spectrum_2d = np.abs(np.fft.fftshift(np.fft.fft2(gray - gray.mean())))
+    yy, xx = np.mgrid[:h, :w]
+    radius = np.sqrt((yy - h / 2) ** 2 + (xx - w / 2) ** 2)
+    outer = spectrum_2d[radius >= radius.max() * 8 / 12]
+    peak = float(outer.max() / (outer.mean() + 1e-9))
+    score = float(min(1.0, max(0.0, (peak - 5.0) / 10.0)))
+    ring = (radius >= radius.max() * 8 / 12).astype(np.float32) * 255.0
+    return {"score": score, "heatmap_png": _to_heatmap_png(ring * (0.3 + 0.7 * score))}
+
+
+def examine(data: bytes) -> dict:
+    """Run all seven instruments; sha-keyed artifacts reused, never recomputed.
+
+    Returns {scores: {ela, dct, noise, copymove, ghost, blockiness, spectrum,
     fused_mean}, artifacts: {name: path}, note: str}.
     """
     from app.features.analysis.agents import pipeline  # lazy: pipeline imports us
@@ -211,6 +234,7 @@ def examine(data: bytes) -> dict:
                 "copymove",
                 "ghost",
                 "blockiness",
+                "spectrum",
             }:
                 return cached
         except (OSError, ValueError):
@@ -222,6 +246,7 @@ def examine(data: bytes) -> dict:
         "copymove": copy_move(jpeg),
         "ghost": jpeg_ghost(jpeg),
         "blockiness": blockiness(jpeg),
+        "spectrum": spectrum(jpeg),
     }
     artifacts: dict[str, str] = {}
     for name, res in results.items():
@@ -234,7 +259,7 @@ def examine(data: bytes) -> dict:
     payload = {
         "scores": {**scores, "fused_mean": mean},
         "artifacts": artifacts,
-        "note": "Local numeric instruments (ELA/DCT/noise/copy-move/ghost/blockiness); "
+        "note": "Local numeric instruments (ELA/DCT/noise/copy-move/ghost/blockiness/spectrum); "
         "highlights mark regions to inspect, not proof of fakery.",
     }
     try:

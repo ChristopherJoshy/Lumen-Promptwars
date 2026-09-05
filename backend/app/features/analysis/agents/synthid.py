@@ -32,7 +32,25 @@ _GENERATORS = (
     "leonardo",
     "ideogram",
     " playground",
+    "sana",
+    "pollinations",
+    "craiyon",
+    "nightcafe",
+    "starryai",
+    "wombo",
+    "fotor",
+    "picsart",
+    "canva",
+    "hunyuan",
+    "flux",
+    "sdxl",
+    "kandinsky",
+    "black forest",
 )
+
+# A1111-style parameter keys: proof of a generation UI even when the model
+# name itself was stripped.
+_PARAM_KEYS = ("prompt:", "negative prompt:", "steps:", "sampler:", "cfg scale:", "seed:")
 
 
 def _png_text_chunks(data: bytes) -> list[str]:
@@ -113,6 +131,11 @@ def scan(data: bytes) -> dict:
                 markers.append(f"generator tag: ...{snippet}...")
                 if generator is None:
                     generator = sig.strip()
+        for key in _PARAM_KEYS:
+            if key in blob and generator is None:
+                generator = "unbranded generator UI"
+                markers.append(f"generation parameters present ({key.strip()} …)")
+                break
     except Exception:
         pass
     return {"generator": generator, "markers": markers, "c2pa": c2pa}

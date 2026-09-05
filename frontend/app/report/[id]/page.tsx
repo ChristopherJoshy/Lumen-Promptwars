@@ -57,7 +57,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         <section aria-label="Method and limits" className="mt-8 rounded-3xl border border-gridline bg-console p-6">
           <h2 className="font-lab text-xl font-semibold tracking-tight">Method &amp; limits</h2>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-relaxed text-fog">
-            <li>Six local instruments score pixels; origin tags checked; a vision model reads content; web search traces context.</li>
+            <li>Seven local instruments score pixels; origin tags checked; a vision model reads content; web search traces context.</li>
             <li>Heatmaps highlight regions to inspect — they are not proof of fakery.</li>
             <li>This report is a probabilistic documentation aid, not a legal certification.</li>
           </ul>

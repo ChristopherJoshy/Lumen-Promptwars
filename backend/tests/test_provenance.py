@@ -93,3 +93,16 @@ def test_run_fusion_omits_provenance_when_absent(monkeypatch):
     out = _run(agentic.run_fusion(**_fusion_kwargs()))
     assert "provenance" not in out["signals"]
     assert "provenance" not in seen
+
+
+def test_param_keys_catch_unbranded_generator():
+    import struct
+
+    from app.features.analysis.agents import synthid
+
+    text = b"parameters\x00photograph of a cat\nSteps: 30, Sampler: Euler, Seed: 42"
+    body = struct.pack(">I4s", len(text), b"tEXt") + text
+    png = b"\x89PNG\r\n\x1a\n" + body + struct.pack(">I4s", 0, b"IEND")
+    out = synthid.scan(png)
+    assert out["generator"] == "unbranded generator UI"
+    assert any("Steps" in m or "steps" in m for m in out["markers"])

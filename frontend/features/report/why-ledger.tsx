@@ -7,7 +7,7 @@ export interface ProvenanceInfo {
   c2pa?: boolean;
   markers?: string[];
 }
-const TOOL_ORDER = ["ela", "dct", "noise", "copymove"] as const;
+const TOOL_ORDER = ["ela", "dct", "noise", "copymove", "ghost", "blockiness", "spectrum"] as const;
 
 /** Plain-language reasons: instrument rows first, then the judge's own words. */
 export function WhyLedger({

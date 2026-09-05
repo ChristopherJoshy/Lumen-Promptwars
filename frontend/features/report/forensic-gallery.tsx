@@ -4,7 +4,7 @@ import { useState } from "react";
 import { TOOL_LABELS } from "@/lib/verdict";
 import type { ForensicsScores } from "./api";
 
-const NAMES = ["ela", "dct", "noise", "copymove"] as const;
+const NAMES = ["ela", "dct", "noise", "copymove", "ghost", "blockiness", "spectrum"] as const;
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 /** Interactive heatmap gallery: native radios + opacity slider, CSS blend only. */

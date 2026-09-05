@@ -107,6 +107,7 @@ async def handle_inbound(payload: dict) -> str:
         )
 
     if content_type.startswith("image/"):
+        await reply("Photo received — running 7 forensic checks, origin scan, and web context. About 40 seconds…")
         try:
             data = await wa_media.download(media_url)
             result = await agentic.analyze_image(data, mime=content_type, source="whatsapp")
@@ -114,6 +115,7 @@ async def handle_inbound(payload: dict) -> str:
             return await reply(format_failure(str(exc)))
         return await _answer_case(result)
     if content_type.startswith("video/"):
+        await reply("Video received — extracting frames and scanning each one. About a minute…")
         try:
             data = await wa_media.download(media_url)
             result = await agentic.analyze_video(data, mime=content_type, source="whatsapp")
@@ -121,6 +123,7 @@ async def handle_inbound(payload: dict) -> str:
             return await reply(format_failure(str(exc)))
         return await _answer_case(result)
     if content_type.startswith("audio/"):
+        await reply("Voice note received — transcribing and checking for edits. About 40 seconds…")
         try:
             data = await wa_media.download(media_url)
             result = await agentic.analyze_audio(data, mime=content_type, source="whatsapp")
@@ -128,6 +131,7 @@ async def handle_inbound(payload: dict) -> str:
             return await reply(format_failure(str(exc)))
         return await _answer_case(result)
     if body.startswith(("http://", "https://")):
+        await reply("Link received — fetching the media and scanning it. About a minute…")
         try:
             result = await agentic.analyze_link(body, source="whatsapp")
         except Exception as exc:

@@ -72,4 +72,19 @@ export const TOOL_LABELS: Record<string, { name: string; gloss: string; mechanis
     gloss: "clone-region check",
     mechanism: "Hunts duplicated pixel blocks: cloned areas stamped twice inside one frame.",
   },
+  ghost: {
+    name: "Ghost",
+    gloss: "double-compression check",
+    mechanism: "Re-saves at several qualities: spliced regions bottom out at a different quality than the background.",
+  },
+  blockiness: {
+    name: "Blockiness",
+    gloss: "grid-alignment check",
+    mechanism: "Checks JPEG grid edges: pasted content breaks the camera's 8-pixel block rhythm.",
+  },
+  spectrum: {
+    name: "Spectrum",
+    gloss: "frequency-fingerprint check",
+    mechanism: "Reads the image's frequency fingerprint: generators leave sharp high-frequency peaks that cameras don't.",
+  },
 };
