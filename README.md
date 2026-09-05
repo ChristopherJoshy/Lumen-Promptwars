@@ -4,6 +4,7 @@
   <a href="https://lumen-promptwars.vercel.app"><img src="https://img.shields.io/badge/🌐_Live_Demo-lumen--promptwars.vercel.app-22D3EE?style=for-the-badge" alt="Live demo"/></a>
   <img src="https://img.shields.io/badge/verdicts-AI_debate_powered-F59E0B?style=for-the-badge" alt="AI debate"/>
   <img src="https://img.shields.io/badge/languages-22_Indian_+_English-34D399?style=for-the-badge" alt="Languages"/>
+  <img src="https://github.com/ChristopherJoshy/Lumen-Promptwars/actions/workflows/ci.yml/badge.svg" alt="CI"/>
 </p>
 
 > A journalist gets a **Malayalam voice note** claiming a miracle cure. A citizen sees an
