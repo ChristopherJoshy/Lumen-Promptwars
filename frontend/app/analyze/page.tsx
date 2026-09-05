@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Link2, ScanLine, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,12 @@ const ACCEPT = [
   "video/quicktime",
 ];
 const MAX_MB = 25;
+const STAGES = [
+  "Forensic instruments",
+  "Seeing/listening",
+  "Web context",
+  "Judge + critic",
+] as const;
 
 function validate(file: File): string | null {
   if (!ACCEPT.includes(file.type)) return `“${file.type || "unknown type"}” isn't analyzable — use jpg, png, webp, mp3, wav, m4a, mp4, mov, or webm.`;
@@ -36,6 +42,16 @@ export default function AnalyzePage() {
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!busy) return;
+    setElapsed(0);
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [busy]);
+
+  const stageIdx = Math.min(STAGES.length - 1, Math.floor(elapsed / 8));
   const inputRef = useRef<HTMLInputElement>(null);
 
   function goReport(res: unknown) {
@@ -160,10 +176,32 @@ export default function AnalyzePage() {
           </form>
 
           {busy && (
-            <p role="status" aria-busy="true" className="flex items-center gap-2 text-sm text-scan">
-              <ScanLine className="size-4 animate-pulse" aria-hidden />
-              Scanning {fileName || "your submission"} through four instruments plus context trace…
-            </p>
+            <div role="status" aria-busy="true" className="rounded-2xl border border-gridline bg-console p-4">
+              <p className="flex items-center gap-2 text-sm text-scan">
+                <ScanLine className="size-4 animate-pulse" aria-hidden />
+                Stage {stageIdx + 1} of {STAGES.length}: {STAGES[stageIdx]} — {elapsed}s elapsed
+                {fileName ? ` · ${fileName}` : ""}
+              </p>
+              <ol className="mt-3 space-y-1">
+                {STAGES.map((stage, i) => (
+                  <li
+                    key={stage}
+                    aria-current={i === stageIdx ? "step" : undefined}
+                    className={
+                      i === stageIdx
+                        ? "text-sm font-semibold text-foam"
+                        : i < stageIdx
+                          ? "text-sm text-fog"
+                          : "text-sm text-fog/60"
+                    }
+                  >
+                    {i < stageIdx ? "✓ " : i === stageIdx ? "→ " : "· "}
+                    {stage}
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-3 text-xs text-fog">live request, stage estimates</p>
+            </div>
           )}
 
           {notice && (

@@ -41,13 +41,13 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <ScoreLedger fusedMean={fusedMean} verdict={report.verdict} />
         </div>
 
-        <WhyLedger reasons={report.reasons ?? []} signals={report.signals} />
+        <WhyLedger reasons={report.reasons ?? []} signals={report.signals} debate={report.signals?.debate} provenance={report.signals?.provenance} />
 
         {report.signals?.forensics && (
           <ForensicGallery caseId={report.case_id} scores={report.signals.forensics.scores} />
         )}
 
-        {isAudio && <VoiceBlock sarvam={report.signals?.sarvam} />}
+        {isAudio && <VoiceBlock sarvam={report.signals?.sarvam} audioTools={report.signals?.perceptual?.audio_tools} />}
 
         <SourceChips search={report.signals?.search} />
 

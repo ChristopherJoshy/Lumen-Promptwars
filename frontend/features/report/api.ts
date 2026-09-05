@@ -43,6 +43,7 @@ export interface CaseSignals {
     language_guess?: string;
     entities?: string[];
     frames?: number;
+    audio_tools?: { clip_ratio?: number; silence_gaps?: number; dynamic_range_db?: number };
   };
   forensics?: {
     scores?: ForensicsScores;
@@ -60,6 +61,13 @@ export interface CaseSignals {
     warnings?: string[];
   };
   temporal?: { flag?: boolean; note?: string };
+  debate?: {
+    agreed?: boolean | null;
+    counter_reasons?: string[];
+    suggested_verdict?: string;
+    note?: string;
+  };
+  provenance?: { generator?: string | null; c2pa?: boolean; markers?: string[] };
 }
 
 export interface FullReport {

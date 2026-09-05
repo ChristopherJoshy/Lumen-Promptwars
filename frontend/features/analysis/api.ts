@@ -1,9 +1,11 @@
 import { api } from "@/lib/api-client";
 
 export async function uploadFile(file: File): Promise<unknown> {
-  const form = new FormData();
-  form.append("file", file);
-  return api("/api/v1/ingestion/upload", { method: "POST", body: form });
+  return api("/api/v1/ingestion/upload", {
+    method: "POST",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  });
 }
 
 export async function submitLink(url: string): Promise<unknown> {

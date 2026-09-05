@@ -1,15 +1,25 @@
 import { TOOL_LABELS } from "@/lib/verdict";
 import type { CaseSignals } from "./api";
+import { DebateNote, type DebateInfo } from "./debate-note";
 
+export interface ProvenanceInfo {
+  generator?: string | null;
+  c2pa?: boolean;
+  markers?: string[];
+}
 const TOOL_ORDER = ["ela", "dct", "noise", "copymove"] as const;
 
 /** Plain-language reasons: instrument rows first, then the judge's own words. */
 export function WhyLedger({
   reasons,
   signals,
+  debate,
+  provenance,
 }: {
   reasons: string[];
   signals?: CaseSignals;
+  debate?: DebateInfo;
+  provenance?: ProvenanceInfo;
 }) {
   const scores = signals?.forensics?.scores;
   const perceptual = signals?.perceptual;
@@ -63,6 +73,14 @@ export function WhyLedger({
           Trained-eye read: artifact score {Number(perceptual.artifact_score).toFixed(2)}
           {(perceptual.observations?.length ?? 0) > 0 &&
             ` — ${perceptual.observations?.[0]}`}
+        </p>
+      )}
+      <DebateNote debate={debate} />
+      {(provenance?.generator || provenance?.c2pa) && (
+        <p className="mt-4 text-sm leading-relaxed text-fog">
+          {provenance.generator ? `Origin tag: ${provenance.generator}` : ""}
+          {provenance.generator && provenance.c2pa ? " · " : ""}
+          {provenance.c2pa ? "C2PA manifest present" : ""}
         </p>
       )}
       <div className="mt-4 space-y-3">

@@ -1,9 +1,26 @@
 import type { CaseSignals } from "./api";
 
+export interface AudioTools {
+  clip_ratio?: number;
+  silence_gaps?: number;
+  dynamic_range_db?: number;
+}
+
 /** Voice-note block: detected language + transcript + English translation. */
-export function VoiceBlock({ sarvam }: { sarvam?: CaseSignals["sarvam"] }) {
+export function VoiceBlock({
+  sarvam,
+  audioTools,
+}: {
+  sarvam?: CaseSignals["sarvam"];
+  audioTools?: AudioTools;
+}) {
+  const hasTools =
+    audioTools != null &&
+    (audioTools.clip_ratio != null ||
+      audioTools.silence_gaps != null ||
+      audioTools.dynamic_range_db != null);
   const result = sarvam?.result;
-  if (!result?.transcript && !sarvam?.warning) return null;
+  if (!result?.transcript && !sarvam?.warning && !hasTools) return null;
   const lang = (result?.detected_language || "unknown").toLowerCase();
   return (
     <section aria-label="Voice note transcript" className="mt-8 rounded-3xl border border-gridline bg-console p-6">
@@ -37,6 +54,18 @@ export function VoiceBlock({ sarvam }: { sarvam?: CaseSignals["sarvam"] }) {
         </>
       ) : (
         <p className="mt-2 text-sm text-fog">{sarvam?.warning ?? "No transcript available."}</p>
+      )}
+      {hasTools && (
+        <p className="mt-3 font-mono text-xs text-fog">
+          {audioTools?.clip_ratio != null && `clip ratio ${Number(audioTools.clip_ratio).toFixed(3)}`}
+          {audioTools?.clip_ratio != null &&
+            (audioTools?.silence_gaps != null || audioTools?.dynamic_range_db != null) &&
+            " · "}
+          {audioTools?.silence_gaps != null && `silence gaps ${audioTools.silence_gaps}`}
+          {audioTools?.silence_gaps != null && audioTools?.dynamic_range_db != null && " · "}
+          {audioTools?.dynamic_range_db != null &&
+            `dynamic range ${Number(audioTools.dynamic_range_db).toFixed(1)} dB`}
+        </p>
       )}
     </section>
   );
