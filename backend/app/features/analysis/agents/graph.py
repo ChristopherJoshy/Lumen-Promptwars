@@ -177,7 +177,9 @@ async def run_case(
                 perceptual = dict(perceptual)
             else:
                 jpeg = pipeline._normalize_image(ctx["data"])
-                perceptual = await visual_agent.analyze(jpeg, tool_data=state.get("tool"))
+                perceptual = await visual_agent.analyze(
+                    jpeg, tool_data=state.get("tool"), provenance=state.get("provenance")
+                )
         except muse_client.MuseError as exc:
             raise pipeline.AnalysisError(f"Perception failed: {exc}") from exc
         except ValueError as exc:
@@ -222,6 +224,7 @@ async def run_case(
             claimed_date=state.get("claimed_date"),
             source=state.get("source", source),
             forensics_result=tool if modality in ("image", "video") else None,
+            provenance_result=state.get("provenance"),
             sarvam_entry=sarvam_entry,
             caption=(state.get("caption", "") or "")[:500],
         )

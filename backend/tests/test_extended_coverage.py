@@ -149,7 +149,7 @@ def test_audio_coerces_sarvam_language(monkeypatch):
 
 
 def _mock_graph(monkeypatch):
-    async def fake_visual(jpeg, tool_data=None):
+    async def fake_visual(jpeg, tool_data=None, provenance=None):
         return {
             "observations": ["clean"],
             "artifact_score": 0.1,
@@ -255,7 +255,9 @@ def test_reasoning_effort_low_by_default(monkeypatch):
 
     from app.features.analysis.agents import muse_client
 
-    _run(muse_client.respond("sys", [{"type": "input_text", "text": "hi"}]))
+    monkeypatch.setattr(muse_client.httpx, "AsyncClient", _CapClient)
+    monkeypatch.setattr(muse_client.settings, "opencode_zen_api_key", "k")
+    _run(muse_client.respond("Return JSON ONLY with exactly this key: {\"ok\": true}.", [{"type": "input_text", "text": "Reply with the JSON object and no other text."}]))
     assert seen.get("reasoning") == {"effort": "low"}
     assert seen.get("temperature") == 0
 

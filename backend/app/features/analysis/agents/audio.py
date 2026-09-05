@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import base64
 
-from app.features.analysis.agents import muse_client, prompt_pack
+from app.features.analysis.agents import audio_tools, muse_client, prompt_pack
 
 _SYSTEM = (
     "You are a voice-forensics analyst for Lumen. The input is a voice note "
@@ -77,7 +77,7 @@ async def analyze(audio_bytes: bytes, mime: str, sarvam_hint: dict | None = None
 
     Returns:
         Dict with observations, artifact_score, transcript_hint,
-        language_guess, entities.
+        language_guess, entities, audio_tools (examine_audio dict or None).
 
     Raises:
         muse_client.MuseError: Zen call failed or returned bad JSON.
@@ -88,6 +88,14 @@ async def analyze(audio_bytes: bytes, mime: str, sarvam_hint: dict | None = None
         listen_bytes, data_mime = audio_bytes, "audio/wav"
     else:
         listen_bytes, data_mime = _to_wav(audio_bytes), "audio/wav"
+    # Local numeric forensics are advisory: undecodable bytes degrade to
+    # audio_tools=None (today's wav path never validated, and the suite pins
+    # b"audio" flowing to the model) while empty/transcode failures above
+    # still raise loudly as before. examine_audio itself stays loud.
+    try:
+        tool_scores = audio_tools.examine_audio(listen_bytes)
+    except ValueError:
+        tool_scores = None
     b64 = base64.b64encode(listen_bytes).decode()
     user_text = "Analyze this audio. Return JSON only, no commentary."
     if sarvam_hint:
@@ -96,6 +104,12 @@ async def analyze(audio_bytes: bytes, mime: str, sarvam_hint: dict | None = None
             f"{sarvam_hint.get('transcript', '')}"
             + (f" / English: {sarvam_hint.get('translated_en')}" if sarvam_hint.get("translated_en") else "")
             + " Do not re-transcribe; judge synthesis/editing cues only."
+        )
+    if tool_scores is not None:
+        user_text += (
+            f" Local numeric audio forensics: clip_ratio={tool_scores['clip_ratio']:.3f},"
+            f" silence_gaps={tool_scores['silence_gaps']},"
+            f" dynamic_range_db={tool_scores['dynamic_range_db']:.1f} dB."
         )
     parts = [
         {
@@ -125,4 +139,5 @@ async def analyze(audio_bytes: bytes, mime: str, sarvam_hint: dict | None = None
         "transcript_hint": transcript_hint,
         "language_guess": language_guess,
         "entities": list(result["entities"]),
+        "audio_tools": tool_scores,
     }

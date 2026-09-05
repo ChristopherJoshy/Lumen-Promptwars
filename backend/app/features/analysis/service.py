@@ -40,15 +40,27 @@ def list_signals(case_id: str) -> list[dict] | None:
         return None
     signals = case.get("signals", {})
     rows: list[dict] = []
-    perceptual = signals.get("perceptual", {})
+    perceptual = signals.get("perceptual", {}) or {}
     if perceptual:
         rows.append(
             {
                 "name": "perceptual",
                 "finding": f"artifact_score {perceptual.get('artifact_score', '?')}; "
-                f"{len(perceptual.get('observations', []))} observations",
+                f"{len(perceptual.get('observations', []) or [])} observations",
             }
         )
+        audio_tools = perceptual.get("audio_tools")
+        if audio_tools:
+            rows.append(
+                {
+                    "name": "audio_tools",
+                    "finding": (
+                        f"clip {audio_tools.get('clip', '?')}; "
+                        f"gaps {audio_tools.get('gaps', '?')}; "
+                        f"dr {audio_tools.get('dr', '?')}"
+                    ),
+                }
+            )
     forensics = signals.get("forensics")
     if forensics:
         scores = forensics.get("scores", {})
@@ -75,8 +87,8 @@ def list_signals(case_id: str) -> list[dict] | None:
         )
     search = signals.get("search", {})
     if search:
-        india = search.get("india_hits", [])
-        total = len(search.get("exa_hits", [])) + len(search.get("ddg_hits", []))
+        india = search.get("india_hits", []) or []
+        total = len(search.get("exa_hits", []) or []) + len(search.get("ddg_hits", []) or [])
         rows.append(
             {"name": "context", "finding": f"{total} web hits, {len(india)} India fact-checker hits"}
         )
@@ -89,6 +101,28 @@ def list_signals(case_id: str) -> list[dict] | None:
                 + (" [FLAGGED]" if temporal.get("flag") else ""),
             }
         )
+    provenance = signals.get("provenance")
+    if provenance:
+        markers = provenance.get("markers", []) or []
+        rows.append(
+            {
+                "name": "provenance",
+                "finding": (
+                    f"generator {provenance.get('generator', '?')}; "
+                    f"{len(markers)} markers; c2pa {provenance.get('c2pa', '?')}"
+                ),
+            }
+        )
+    debate = signals.get("debate")
+    if debate:
+        if debate.get("agreed") is True:
+            finding = "judge and critic agreed"
+        elif debate.get("agreed") is False:
+            counters = debate.get("counter_reasons", []) or []
+            finding = "critic dissented: " + ("; ".join(str(c) for c in counters) or "no reasons given")
+        else:
+            finding = str(debate.get("note") or "debate skipped")
+        rows.append({"name": "debate", "finding": finding})
     return rows
 
 

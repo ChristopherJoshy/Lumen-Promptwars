@@ -28,7 +28,7 @@ _SYSTEM = (
     '{"verdict": str, "confidence": float 0..1, "explanation": str 2-4 sentences, '
     '"reasons": [str]}. Reference concrete artifacts, dates, and hit URLs; '
     "never hedge generically.\n"
-    + prompt_pack.load("forward_tells")
+    + prompt_pack.load("forward_tells") + " Provenance rule: a named generator tag or C2PA manifest presence is strong positive evidence of AI generation, while absence proves nothing since markers strip trivially."
 )
 
 

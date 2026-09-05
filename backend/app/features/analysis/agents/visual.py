@@ -24,7 +24,7 @@ _SYSTEM = (
 )
 
 
-async def analyze(image_jpeg: bytes, tool_data: dict | None = None) -> dict:
+async def analyze(image_jpeg: bytes, tool_data: dict | None = None, provenance: dict | None = None) -> dict:
     """Analyze a normalized JPEG for manipulation artifacts.
 
     Args:
@@ -50,6 +50,8 @@ async def analyze(image_jpeg: bytes, tool_data: dict | None = None) -> dict:
             + f"; fused={scores.get('fused_mean', '?')}. Scores near 0 mean clean, "
             "near 1 mean tampered. Weigh them above your own eyeballing."
         )
+    if provenance and provenance.get("generator"):
+        user_text += f" Ground-truth origin evidence: provenance scan names generator '{provenance['generator']}' — treat it as strong positive evidence of AI generation."
     parts = [
         {
             "type": "input_text",

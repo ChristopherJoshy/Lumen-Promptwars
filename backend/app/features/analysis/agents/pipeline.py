@@ -295,6 +295,7 @@ async def run_fusion(
     claimed_date: str | None,
     source: str,
     forensics_result: dict | None = None,
+    provenance_result: dict | None = None,
     sarvam_entry: dict | None = None,
     meta_dates: dict | None = None,
     unresolved_platform: str | None = None,
@@ -319,6 +320,8 @@ async def run_fusion(
     }
     if forensics_result is not None:
         signals["forensics"] = forensics_result
+    if provenance_result is not None:
+        signals["provenance"] = provenance_result
     if sarvam_entry is not None:
         signals["sarvam"] = sarvam_entry
     try:
