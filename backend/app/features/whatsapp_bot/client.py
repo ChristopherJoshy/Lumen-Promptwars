@@ -22,6 +22,10 @@ async def send_verdict(to: str, text: str, report_url: str) -> None:
     sender = settings.twilio_whatsapp_number
     if not sid or not token or not sender:
         raise ValueError("Twilio credentials are not configured.")
+    if not sender.startswith("whatsapp:"):
+        raise ValueError(
+            "TWILIO_WHATSAPP_NUMBER must look like whatsapp:+14155238886 (whatsapp: prefix required)."
+        )
     _ = report_url
     url = f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json"
     try:
