@@ -36,6 +36,8 @@ services:
         value: https://lumen-promptwars.onrender.com/api/v1/whatsapp/webhook
       - key: TWILIO_AUTH_TOKEN
         sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
     disk:
       name: lumen-storage
       mountPath: /opt/render/project/src/storage
