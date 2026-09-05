@@ -2,6 +2,11 @@
 
 Format: `## <date> — <scope>` + bullets. Newest first. One line per change.
 
+## 2026-09-05 — readme showcase overhaul
+
+- README rewritten as detailed showcase: badges, live frontend/API links,
+- mermaid architecture, agent table, API reference, WhatsApp setup, deploy map
+
 ## 2026-09-05 — forensic graph, voice, scan-lab UI, instant cache, usage
 
 - Local numeric forensics (`agents/forensics.py`: ELA/DCT/noise/copy-move,
