@@ -58,7 +58,7 @@ export function ScoreLedger({
           </p>
           <p className="mt-1 text-sm text-fog">{band.blurb}.</p>
           <p className="mt-3 text-xs leading-relaxed text-fog">
-            Fused from 4 local instruments (ELA, DCT, noise, copy-move). Higher means more
+            Fused from 6 local instruments (ELA, DCT, noise, copy-move, ghost, blockiness). Higher means more
             likely synthetic or spliced. The judge&apos;s verdict below wins over this number —
             the score alone never decides.
           </p>
