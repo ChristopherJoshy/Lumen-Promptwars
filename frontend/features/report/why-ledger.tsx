@@ -28,11 +28,25 @@ export function WhyLedger({
       <h2 className="font-lab text-xl font-semibold tracking-tight text-foam">
         Why this verdict
       </h2>
+      <p className="mt-1 max-w-prose text-sm leading-relaxed text-fog">
+        Seven automatic checks plus a trained AI eye. Green means clean, red means
+        tampered — tap any row for the how and why.
+      </p>
       {scores && (
         <ol className="mt-4 space-y-3">
           {TOOL_ORDER.map((key, i) => {
             const tool = TOOL_LABELS[key];
             const score = scores[key];
+            const finding =
+              typeof score !== "number"
+                ? { words: "Not measured", dot: "bg-fog" }
+                : score < 0.3
+                  ? { words: "Looks clean", dot: "bg-lab-verified" }
+                  : score < 0.55
+                    ? { words: "Unclear", dot: "bg-fog" }
+                    : score < 0.7
+                      ? { words: "Suspicious", dot: "bg-lab-contradiction" }
+                      : { words: "Strong sign of tampering", dot: "bg-lab-synthetic" };
             return (
               <li key={key}>
                 <details
@@ -40,20 +54,21 @@ export function WhyLedger({
                   className="group rounded-2xl border border-gridline bg-console px-5 py-4"
                 >
                   <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                    <span className="font-mono text-xs tracking-widest text-fog uppercase">
-                      Forensic · {tool.name}
-                      {typeof score === "number" ? ` ${score.toFixed(2)}` : ""}
+                    <span className="flex items-center gap-2 font-semibold text-foam">
+                      <span aria-hidden className={`size-2.5 rounded-full ${finding.dot}`} />
+                      {finding.words}
+                      <span className="font-normal text-fog">· {tool.name}</span>
                     </span>
-                    <span className="mt-1 block font-semibold text-foam">{tool.gloss}</span>
+                    <span className="mt-1 block text-sm text-fog">{tool.gloss}</span>
                   </summary>
-                  <p className="mt-2 text-sm leading-relaxed text-fog">{tool.mechanism}</p>
+                  <p className="mt-2 max-w-prose text-sm leading-relaxed text-fog">{tool.mechanism}</p>
                   {typeof score === "number" && (
                     <div
                       role="meter"
                       aria-valuemin={0}
                       aria-valuemax={1}
                       aria-valuenow={Number(score.toFixed(2))}
-                      aria-label={`${tool.name} score ${score.toFixed(2)}`}
+                      aria-label={`${tool.name} score ${score.toFixed(2)}: ${finding.words}`}
                       className="mt-3 h-2 overflow-hidden rounded-full bg-gridline"
                     >
                       <div
@@ -69,10 +84,15 @@ export function WhyLedger({
         </ol>
       )}
       {perceptual?.artifact_score != null && (
-        <p className="mt-4 text-sm leading-relaxed text-fog">
-          Trained-eye read: artifact score {Number(perceptual.artifact_score).toFixed(2)}
+        <p className="mt-4 max-w-prose text-sm leading-relaxed text-fog">
+          <span className="font-semibold text-foam">Trained AI eye: </span>
+          {Number(perceptual.artifact_score) < 0.3
+            ? "looks like an ordinary capture."
+            : Number(perceptual.artifact_score) < 0.55
+              ? "sees something odd but can't call it."
+              : "spots likely manipulation."}
           {(perceptual.observations?.length ?? 0) > 0 &&
-            ` — ${perceptual.observations?.[0]}`}
+            ` ${perceptual.observations?.[0]}`}
         </p>
       )}
       <DebateNote debate={debate} />

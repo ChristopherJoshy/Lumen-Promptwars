@@ -1,7 +1,6 @@
 import { bandForScore } from "@/lib/verdict";
 import type { Verdict } from "@/types";
-
-const CIRCLE = 2 * Math.PI * 54;
+import { ScoreDial } from "./score-dial";
 
 /** Fused manipulation-probability readout: dial + banded meter + caption. */
 export function ScoreLedger({
@@ -26,38 +25,16 @@ export function ScoreLedger({
   return (
     <section aria-label="Manipulation score" className="rounded-3xl border border-gridline bg-console p-6 sm:p-8">
       <div className="flex flex-wrap items-center gap-6">
-        <div
-          role="meter"
-          aria-valuemin={0}
-          aria-valuemax={1}
-          aria-valuenow={Number(fusedMean.toFixed(2))}
-          aria-label={`Fused manipulation probability ${fusedMean.toFixed(2)}, band ${band.word}`}
-          className="relative size-32 shrink-0"
-        >
-          <svg viewBox="0 0 120 120" className="size-32 -rotate-90" aria-hidden>
-            <circle cx="60" cy="60" r="54" fill="none" strokeWidth="10" className="stroke-gridline" />
-            <circle
-              cx="60"
-              cy="60"
-              r="54"
-              fill="none"
-              strokeWidth="10"
-              strokeLinecap="round"
-              strokeDasharray={CIRCLE.toFixed(1)}
-              strokeDashoffset={(CIRCLE * (1 - Math.min(1, Math.max(0, fusedMean)))).toFixed(1)}
-              className="lab-dial-ring stroke-scan"
-            />
-          </svg>
-          <p className="absolute inset-0 flex items-center justify-center font-mono text-2xl text-foam tabular-nums">
-            {fusedMean.toFixed(2)}
-          </p>
-        </div>
+        <ScoreDial
+          value={fusedMean}
+          label={`Fused manipulation probability ${fusedMean.toFixed(2)}, band ${band.word}`}
+        />
         <div>
           <p className="font-lab text-sm font-semibold tracking-widest text-fog uppercase">
             Manipulation probability · {band.word}
           </p>
           <p className="mt-1 text-sm text-fog">{band.blurb}.</p>
-          <p className="mt-3 text-xs leading-relaxed text-fog">
+          <p className="mt-3 max-w-prose text-xs leading-relaxed text-fog">
             Fused from 7 local instruments (ELA, DCT, noise, copy-move, ghost, blockiness, spectrum). Higher means more
             likely synthetic or spliced. The judge&apos;s verdict below wins over this number —
             the score alone never decides.
@@ -84,7 +61,7 @@ export function ScoreLedger({
         </div>
       </div>
       {conflict && (
-        <p className="mt-4 rounded-2xl border border-fuse-hi/50 bg-fuse-hi/10 p-4 text-sm leading-relaxed text-foam">
+        <p className="mt-4 max-w-prose rounded-2xl border border-fuse-hi/50 bg-fuse-hi/10 p-4 text-sm leading-relaxed text-foam">
           Instruments read high ({fusedMean.toFixed(2)}) but perceptual and context checks
           disagree — verdict set to{" "}
           {verdict === "insufficient_evidence" ? "Insufficient evidence" : verdict}. See the
