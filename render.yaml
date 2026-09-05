@@ -30,13 +30,11 @@ services:
         sync: false
       - key: SARVAM_BASE_URL
         value: https://api.sarvam.ai
-      - key: SARVAM_MODEL
-        value: saaras:v3
-      - key: TWILIO_ACCOUNT_SID
-        sync: false
-      - key: TWILIO_AUTH_TOKEN
-        sync: false
       - key: TWILIO_WHATSAPP_NUMBER
+        sync: false
+      - key: TWILIO_WEBHOOK_URL
+        value: https://lumen-promptwars.onrender.com/api/v1/whatsapp/webhook
+      - key: TWILIO_AUTH_TOKEN
         sync: false
     disk:
       name: lumen-storage
