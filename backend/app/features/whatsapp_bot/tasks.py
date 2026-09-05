@@ -81,12 +81,16 @@ async def handle_inbound(payload: dict) -> str:
     content_type = _pick_content_type(payload)
     media_url = str(payload.get("MediaUrl0", "") or "")
 
+    import logging
+
+    log = logging.getLogger("lumen.whatsapp")
+
     async def reply(text: str, report_url: str = "") -> str:
         if sender:
             try:
                 await wa_client.send_verdict(sender, text, report_url)
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning("WhatsApp send to %s failed: %s", sender, exc)
         return text
 
     def _report_url(case_id: str) -> str:
